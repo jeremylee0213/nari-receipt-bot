@@ -5,326 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lily's Receipt Bot</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <style>
-        :root {
-            --primary: #9B72CF;
-            --primary-dark: #7B52AF;
-            --primary-light: #F3EEFA;
-            --primary-glow: rgba(155,114,207,.25);
-            --bg: linear-gradient(135deg, #F8F5FD 0%, #F0E8FA 50%, #EDE4F7 100%);
-            --card: rgba(255,255,255,.72);
-            --card-solid: #FDFCFF;
-            --text: #3D2E5C;
-            --muted: #9A8BB5;
-            --border: rgba(155,114,207,.18);
-            --success: #7EC8A0;
-            --success-dark: #5BA87E;
-            --warning: #E8B86D;
-            --danger: #D97B8F;
-            --radius: 14px;
-            --lily-pink: #E8B4D0;
-            --lily-white: #F5EEF8;
-        }
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body {
-            font-family:'Noto Sans KR','Quicksand',sans-serif;
-            background:var(--bg); color:var(--text); min-height:100vh;
-            overflow-x:hidden; position:relative;
-        }
-
-        /* ===== Falling Lily Petals ===== */
-        .petal-container { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:0; overflow:hidden; }
-        .petal {
-            position:absolute; top:-40px; opacity:0;
-            animation:petal-fall linear forwards;
-        }
-        .petal svg { filter:drop-shadow(0 2px 4px rgba(155,114,207,.15)); }
-        @keyframes petal-fall {
-            0% { opacity:0; transform:translateX(0) rotate(0deg); }
-            10% { opacity:.6; }
-            90% { opacity:.4; }
-            100% { opacity:0; transform:translateX(var(--drift)) rotate(var(--spin)); top:105vh; }
-        }
-
-        /* ===== Layout ===== */
-        .app { display:flex; min-height:100vh; max-width:1500px; margin:0 auto; position:relative; z-index:1; }
-
-        /* Left panel - Glassmorphism */
-        .left {
-            width:430px; min-width:430px;
-            background:var(--card);
-            backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-            border-right:1px solid var(--border);
-            border-radius:0 24px 24px 0;
-            display:flex; flex-direction:column; overflow-y:auto;
-            box-shadow:4px 0 30px rgba(155,114,207,.08);
-        }
-        .right { flex:1; padding:24px; overflow-y:auto; }
-
-        /* Header */
-        .left-header {
-            padding:24px 28px 18px;
-            border-bottom:1px solid var(--border);
-            background:linear-gradient(135deg, rgba(155,114,207,.08), rgba(232,180,208,.08));
-        }
-        .left-header h1 {
-            font-family:'Quicksand','Noto Sans KR',sans-serif;
-            font-size:24px; font-weight:700; color:var(--primary);
-            display:flex; align-items:center; gap:8px;
-        }
-        .left-header p { font-size:12px; color:var(--muted); margin-top:3px; letter-spacing:.3px; }
-
-        /* Main actions */
-        .main-actions { padding:22px 28px; flex:1; display:flex; flex-direction:column; gap:16px; }
-
-        /* Drop zone */
-        .drop-zone {
-            border:2px dashed var(--border); border-radius:var(--radius);
-            padding:32px 20px; text-align:center; cursor:pointer;
-            transition:all .3s ease;
-            background:linear-gradient(135deg, var(--lily-white), rgba(243,238,250,.5));
-        }
-        .drop-zone:hover, .drop-zone.drag-over {
-            border-color:var(--primary); background:var(--primary-light);
-            transform:scale(1.01);
-            box-shadow:0 4px 20px var(--primary-glow);
-        }
-        .drop-zone-icon { font-size:42px; margin-bottom:6px; }
-        .drop-zone-text { font-size:13px; color:var(--muted); }
-        .drop-zone-text strong { color:var(--primary); }
-
-        .thumbnails { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-        .thumb {
-            position:relative; width:56px; height:56px;
-            border-radius:10px; overflow:hidden;
-            border:2px solid var(--border); transition:all .2s;
-        }
-        .thumb:hover { transform:scale(1.1); border-color:var(--primary); box-shadow:0 2px 10px var(--primary-glow); }
-        .thumb img { width:100%; height:100%; object-fit:cover; }
-        .thumb-remove {
-            position:absolute; top:2px; right:2px; width:18px; height:18px;
-            background:var(--danger); color:#fff; border:none; border-radius:50%;
-            font-size:9px; cursor:pointer; display:flex; align-items:center; justify-content:center;
-            transition:transform .2s;
-        }
-        .thumb-remove:hover { transform:scale(1.2); }
-        .file-count { font-size:12px; color:var(--muted); margin-top:4px; }
-
-        /* OCR Button */
-        .btn-ocr {
-            padding:18px 24px; border:none; border-radius:16px; font-size:17px; font-weight:700;
-            font-family:'Quicksand','Noto Sans KR',sans-serif;
-            cursor:pointer; width:100%; color:#fff;
-            background:linear-gradient(135deg, #B388E8, #9B72CF, #8B5CC0);
-            box-shadow:0 6px 25px rgba(155,114,207,.35);
-            transition:all .3s; position:relative; overflow:hidden;
-            letter-spacing:.5px;
-        }
-        .btn-ocr::before {
-            content:''; position:absolute; top:0; left:-100%; width:100%; height:100%;
-            background:linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
-            transition:left .5s;
-        }
-        .btn-ocr:hover:not(:disabled)::before { left:100%; }
-        .btn-ocr:hover:not(:disabled) { transform:translateY(-3px); box-shadow:0 8px 30px rgba(155,114,207,.45); }
-        .btn-ocr:active:not(:disabled) { transform:translateY(0); }
-        .btn-ocr:disabled { opacity:.35; cursor:not-allowed; transform:none; }
-
-        /* Excel Button */
-        .btn-excel {
-            padding:18px 24px; border:none; border-radius:16px; font-size:17px; font-weight:700;
-            font-family:'Quicksand','Noto Sans KR',sans-serif;
-            cursor:pointer; width:100%; color:#fff;
-            background:linear-gradient(135deg, #A8D8B8, #7EC8A0, #5BA87E);
-            box-shadow:0 6px 25px rgba(126,200,160,.3);
-            transition:all .3s; position:relative; overflow:hidden;
-            letter-spacing:.5px;
-        }
-        .btn-excel::before {
-            content:''; position:absolute; top:0; left:-100%; width:100%; height:100%;
-            background:linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
-            transition:left .5s;
-        }
-        .btn-excel:hover::before { left:100%; }
-        .btn-excel:hover { transform:translateY(-3px); box-shadow:0 8px 30px rgba(126,200,160,.4); }
-        .btn-excel:active { transform:translateY(0); }
-        .btn-excel.downloading { animation:btn-celebrate .6s ease; }
-        @keyframes btn-celebrate {
-            0% { transform:scale(1); }
-            30% { transform:scale(.95); }
-            60% { transform:scale(1.05); }
-            100% { transform:scale(1); }
-        }
-
-        /* Status bar */
-        .status-bar { padding:10px 14px; border-radius:10px; font-size:13px; font-weight:500; display:none; align-items:center; gap:8px; }
-        .status-bar.show { display:flex; }
-        .status-info { background:var(--primary-light); color:var(--primary); }
-        .status-success { background:rgba(126,200,160,.15); color:var(--success-dark); }
-        .status-error { background:rgba(217,123,143,.12); color:var(--danger); }
-
-        /* Loading animation - lily themed */
-        .loading-container { display:none; flex-direction:column; align-items:center; gap:16px; padding:20px; }
-        .loading-container.show { display:flex; }
-        .loading-dots { display:flex; gap:10px; align-items:center; }
-        .loading-dot {
-            width:14px; height:14px; border-radius:50%;
-            animation:lily-pulse 1.6s ease-in-out infinite;
-        }
-        .loading-dot:nth-child(1) { background:#C9A0E8; animation-delay:0s; }
-        .loading-dot:nth-child(2) { background:#B388E8; animation-delay:.2s; }
-        .loading-dot:nth-child(3) { background:#E8B4D0; animation-delay:.4s; }
-        .loading-dot:nth-child(4) { background:#9B72CF; animation-delay:.6s; }
-        @keyframes lily-pulse {
-            0%,80%,100% { transform:scale(.4); opacity:.3; }
-            40% { transform:scale(1.1); opacity:1; }
-        }
-        .loading-text { font-size:14px; font-weight:600; color:var(--primary); }
-        .loading-sub { font-size:12px; color:var(--muted); }
-        .progress-bar { width:100%; height:8px; background:rgba(155,114,207,.12); border-radius:4px; overflow:hidden; }
-        .progress-fill { height:100%; background:linear-gradient(90deg,#B388E8,#E8B4D0,#9B72CF); border-radius:4px; transition:width .4s ease; }
-
-        /* Lily particle burst */
-        .particle-container { position:fixed; pointer-events:none; z-index:9999; }
-        .particle {
-            position:absolute; width:8px; height:8px; border-radius:50%;
-            animation:particle-fly 1s ease-out forwards;
-        }
-        @keyframes particle-fly {
-            0% { opacity:1; transform:translate(0,0) scale(1); }
-            100% { opacity:0; transform:translate(var(--tx),var(--ty)) scale(0); }
-        }
-
-        /* Lily bloom celebration */
-        .bloom-overlay {
-            position:fixed; top:0; left:0; width:100%; height:100%;
-            pointer-events:none; z-index:9998;
-            display:flex; align-items:center; justify-content:center;
-        }
-        .bloom-lily {
-            font-size:80px; opacity:0;
-            animation:lily-bloom 2s ease-out forwards;
-        }
-        @keyframes lily-bloom {
-            0% { opacity:0; transform:scale(0) rotate(-30deg); }
-            30% { opacity:1; transform:scale(1.3) rotate(10deg); }
-            50% { transform:scale(1) rotate(0deg); }
-            70% { opacity:1; }
-            100% { opacity:0; transform:scale(1.5) rotate(15deg) translateY(-40px); }
-        }
-        .bloom-text {
-            position:absolute; font-size:20px; font-weight:700; color:var(--primary);
-            opacity:0; animation:bloom-text-fade 2s ease-out .3s forwards;
-            font-family:'Quicksand',sans-serif; text-shadow:0 2px 10px rgba(155,114,207,.3);
-        }
-        @keyframes bloom-text-fade {
-            0% { opacity:0; transform:translateY(20px); }
-            30% { opacity:1; transform:translateY(-50px); }
-            70% { opacity:1; }
-            100% { opacity:0; transform:translateY(-70px); }
-        }
-
-        /* Summary */
-        .summary { display:flex; gap:10px; margin-top:8px; }
-        .summary-item {
-            flex:1; padding:14px; border-radius:12px; text-align:center;
-            background:linear-gradient(135deg, var(--lily-white), var(--primary-light));
-            border:1px solid var(--border);
-        }
-        .summary-value { font-size:22px; font-weight:900; color:var(--primary); font-family:'Quicksand',sans-serif; }
-        .summary-label { font-size:11px; color:var(--muted); margin-top:2px; }
-
-        /* Settings panel */
-        .settings-toggle {
-            padding:12px 28px; border-top:1px solid var(--border); cursor:pointer;
-            display:flex; align-items:center; justify-content:space-between;
-            font-size:12px; font-weight:600; color:var(--muted);
-            background:rgba(243,238,250,.5); transition:background .2s;
-        }
-        .settings-toggle:hover { background:var(--primary-light); }
-        .settings-panel {
-            padding:0 28px; max-height:0; overflow:hidden;
-            transition:max-height .3s ease, padding .3s ease;
-            background:var(--card-solid);
-        }
-        .settings-panel.open { max-height:600px; padding:16px 28px; }
-        .section { margin-bottom:12px; }
-        .section-title { font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid var(--primary-light); }
-
-        label { display:block; font-size:11px; font-weight:500; color:var(--muted); margin-bottom:3px; }
-        input, select {
-            width:100%; padding:8px 12px; border:1px solid var(--border);
-            border-radius:10px; font-size:13px; font-family:inherit; outline:none;
-            transition:all .2s; background:rgba(255,255,255,.8);
-        }
-        input:focus, select:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-glow); }
-        .input-group { margin-bottom:8px; }
-        .input-row { display:flex; gap:8px; }
-        .input-row > div { flex:1; }
-
-        /* API tabs */
-        .api-selector { display:flex; border-radius:10px; overflow:hidden; border:1px solid var(--border); }
-        .api-tab {
-            flex:1; padding:6px 0; border:none; font-size:12px; font-weight:600;
-            font-family:inherit; cursor:pointer; transition:all .2s; color:var(--muted);
-            background:rgba(243,238,250,.4);
-        }
-        .api-tab+.api-tab { border-left:1px solid var(--border); }
-        .api-tab.active { background:var(--primary); color:#fff; }
-        .api-tab:hover:not(.active) { background:var(--primary-light); color:var(--primary); }
-        .api-key-wrap { position:relative; }
-        .api-key-toggle { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:14px; color:var(--muted); }
-
-        /* Name mapping */
-        .mapping-list { max-height:150px; overflow-y:auto; margin-top:6px; }
-        .mapping-item { display:flex; align-items:center; gap:4px; padding:4px 0; font-size:11px; border-bottom:1px solid var(--border); }
-        .mapping-item span { flex:1; }
-        .btn-sm { padding:4px 10px; font-size:11px; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-weight:600; }
-        .btn-outline-sm { background:transparent; color:var(--primary); border:1px solid var(--primary); transition:all .2s; }
-        .btn-outline-sm:hover { background:var(--primary); color:#fff; }
-        .row-btn { width:22px; height:22px; border:none; border-radius:6px; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center; transition:all .2s; }
-        .row-btn-del { background:rgba(217,123,143,.12); color:var(--danger); }
-        .row-btn-del:hover { background:var(--danger); color:#fff; }
-
-        /* ===== Data Table ===== */
-        .data-table-wrap { overflow-x:auto; border-radius:var(--radius); box-shadow:0 2px 15px rgba(155,114,207,.08); }
-        .data-table { width:100%; border-collapse:collapse; font-size:13px; }
-        .data-table th {
-            background:linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color:#fff; padding:10px 12px; text-align:left; font-weight:600;
-            white-space:nowrap; position:sticky; top:0; z-index:1;
-        }
-        .data-table th:first-child { border-radius:var(--radius) 0 0 0; }
-        .data-table th:last-child { border-radius:0 var(--radius) 0 0; }
-        .data-table td { padding:6px 10px; border-bottom:1px solid var(--border); white-space:nowrap; background:rgba(255,255,255,.6); }
-        .data-table tr:hover td { background:var(--primary-light); }
-        .data-table input {
-            padding:4px 6px; font-size:12px; border:1px solid var(--border);
-            border-radius:8px; width:100%; min-width:50px;
-            background:rgba(255,255,255,.9);
-        }
-        .data-table .name-input { min-width:70px; }
-        .data-table .service-input { min-width:120px; }
-        .data-table .amount-input { min-width:70px; text-align:right; }
-        .unknown-cell { background:rgba(232,180,109,.1) !important; }
-        .unknown-cell input { border-color:var(--warning); background:rgba(232,180,109,.08); }
-
-        .empty-state { text-align:center; padding:80px 20px; color:var(--muted); }
-        .empty-state-icon { font-size:64px; margin-bottom:16px; }
-        .empty-state p { font-size:14px; line-height:1.6; }
-
-        .btn {
-            display:inline-flex; align-items:center; justify-content:center; gap:6px;
-            padding:7px 14px; border:none; border-radius:10px; font-size:12px;
-            font-weight:600; font-family:inherit; cursor:pointer; transition:all .2s;
-        }
-        .btn-primary { background:var(--primary); color:#fff; }
-        .btn-primary:hover { background:var(--primary-dark); transform:translateY(-1px); }
-        .btn-outline { background:transparent; color:var(--primary); border:1px solid var(--primary); }
-        .btn-outline:hover { background:var(--primary); color:#fff; }
-    </style>
 </head>
 <body>
     <!-- Falling Lily Petals Background -->
@@ -340,22 +23,24 @@
 
             <div class="main-actions">
                 <!-- Upload -->
-                <div class="drop-zone" id="dropZone">
+                <div class="drop-zone" id="dropZone" role="button" aria-label="Upload receipt images - drag, click, or paste">
                     <div class="drop-zone-icon">&#128206;</div>
                     <div class="drop-zone-text">
                         <strong>Drag</strong>, <strong>Click</strong> or <strong>Ctrl+V</strong><br>
                         <small>PNG, JPG, PDF / Multiple files / Paste supported</small>
                     </div>
-                    <input type="file" id="fileInput" accept="image/*,application/pdf" multiple hidden>
+                    <input type="file" id="fileInput" accept="image/*,application/pdf" multiple hidden aria-label="Select receipt files">
                 </div>
-                <div class="thumbnails" id="thumbnails"></div>
-                <div class="file-count" id="fileCount"></div>
+                <div class="thumbnails" id="thumbnails" role="list" aria-label="Uploaded file thumbnails"></div>
+                <div class="file-count" id="fileCount" aria-live="polite"></div>
+
+                <div class="section-divider"></div>
 
                 <!-- Settings -->
                 <div class="input-row">
                     <div class="input-group">
-                        <label>Month</label>
-                        <select id="month">
+                        <label for="month">Month</label>
+                        <select id="month" aria-label="Settlement month">
                             <option value="1">1</option><option value="2">2</option><option value="3">3</option>
                             <option value="4">4</option><option value="5">5</option><option value="6">6</option>
                             <option value="7">7</option><option value="8">8</option><option value="9">9</option>
@@ -363,27 +48,29 @@
                         </select>
                     </div>
                     <div class="input-group">
-                        <label>Year</label>
-                        <input type="number" id="year" value="2026" min="2019" max="2030">
+                        <label for="year">Year</label>
+                        <input type="number" id="year" value="2026" min="2019" max="2030" aria-label="Settlement year">
                     </div>
                     <div class="input-group">
-                        <label>Exchange Rate</label>
-                        <input type="number" id="exchangeRate" step="0.0001" value="9.3416">
+                        <label for="exchangeRate">Exchange Rate</label>
+                        <input type="number" id="exchangeRate" step="0.0001" value="9.3416" aria-label="JPY to KRW exchange rate">
                     </div>
                     <div class="input-group">
-                        <label>Remittance Fee</label>
-                        <input type="number" id="remittanceFee" step="1" value="49485">
+                        <label for="remittanceFee">Remittance Fee</label>
+                        <input type="number" id="remittanceFee" step="1" value="49485" aria-label="Remittance fee in KRW">
                     </div>
                 </div>
 
+                <div class="section-divider"></div>
+
                 <!-- OCR Button -->
-                <button class="btn-ocr" id="ocrBtn" onclick="startOCR()" disabled>
+                <button class="btn-ocr" id="ocrBtn" onclick="startOCR()" disabled aria-label="Start OCR analysis on uploaded images">
                     Start OCR Analysis
                 </button>
 
                 <!-- Loading -->
-                <div class="loading-container" id="loadingContainer">
-                    <div class="loading-dots">
+                <div class="loading-container" id="loadingContainer" role="status" aria-live="polite">
+                    <div class="loading-dots" aria-hidden="true">
                         <div class="loading-dot"></div>
                         <div class="loading-dot"></div>
                         <div class="loading-dot"></div>
@@ -391,53 +78,54 @@
                     </div>
                     <div class="loading-text" id="loadingText">Analyzing receipts...</div>
                     <div class="loading-sub" id="loadingSub">AI is reading the Japanese text</div>
-                    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                    <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div class="progress-fill" id="progressFill"></div></div>
                 </div>
 
                 <!-- Status -->
-                <div class="status-bar" id="statusBar">
+                <div class="status-bar" id="statusBar" role="alert" aria-live="polite">
                     <span id="statusText"></span>
                 </div>
 
                 <!-- Download -->
                 <div id="downloadSection" style="display:none">
                     <div class="summary" id="summary"></div>
-                    <button class="btn-excel" id="excelBtn" onclick="downloadExcel()" style="margin-top:12px">
+                    <button class="btn-excel" id="excelBtn" onclick="downloadExcel()" style="margin-top:12px" aria-label="Download Excel settlement file">
                         Download Excel
                     </button>
                 </div>
             </div>
 
             <!-- Settings Panel -->
-            <div class="settings-toggle" onclick="toggleSettings()">
+            <div class="settings-toggle" onclick="toggleSettings()" role="button" aria-expanded="false" aria-controls="settingsPanel" tabindex="0">
                 <span>&#9881; API & Name Mapping Settings</span>
-                <span id="settingsArrow">&#9660;</span>
+                <span id="settingsArrow" aria-hidden="true">&#9660;</span>
             </div>
-            <div class="settings-panel" id="settingsPanel">
+            <div class="settings-panel" id="settingsPanel" role="region" aria-label="Settings">
                 <div class="section">
                     <div class="section-title">AI API</div>
                     <div class="input-group">
-                        <div class="api-selector">
-                            <button class="api-tab active" data-api="claude" onclick="switchApi('claude')">Claude</button>
-                            <button class="api-tab" data-api="gemini" onclick="switchApi('gemini')">Gemini</button>
-                            <button class="api-tab" data-api="openai" onclick="switchApi('openai')">OpenAI</button>
+                        <div class="api-selector" role="tablist" aria-label="Select AI provider">
+                            <button class="api-tab active" data-api="claude" onclick="switchApi('claude')" role="tab" aria-selected="true">Claude</button>
+                            <button class="api-tab" data-api="gemini" onclick="switchApi('gemini')" role="tab" aria-selected="false">Gemini</button>
+                            <button class="api-tab" data-api="openai" onclick="switchApi('openai')" role="tab" aria-selected="false">OpenAI</button>
                         </div>
                     </div>
                     <div class="input-group">
                         <div class="api-key-wrap">
-                            <input type="password" id="apiKey" placeholder="API Key">
-                            <button class="api-key-toggle" onclick="toggleApiKey()">&#128065;</button>
+                            <input type="password" id="apiKey" placeholder="API Key" aria-label="AI API key">
+                            <button class="api-key-toggle" onclick="toggleApiKey()" aria-label="Toggle API key visibility">&#128065;</button>
                         </div>
+                        <div class="api-key-note">API key is stored in browser only (not transmitted to servers)</div>
                     </div>
                 </div>
                 <div class="section">
                     <div class="section-title">Name Mapping</div>
                     <div class="input-row">
-                        <div class="input-group"><input type="text" id="newNameRoman" placeholder="HONG GILDONG"></div>
-                        <div class="input-group"><input type="text" id="newNameKorean" placeholder="&#54861;&#44600;&#46041;"></div>
+                        <div class="input-group"><input type="text" id="newNameRoman" placeholder="HONG GILDONG" aria-label="Romanized name"></div>
+                        <div class="input-group"><input type="text" id="newNameKorean" placeholder="&#54861;&#44600;&#46041;" aria-label="Korean name"></div>
                     </div>
-                    <button class="btn-sm btn-outline-sm" onclick="addNameMapping()">Add</button>
-                    <div class="mapping-list" id="mappingList"></div>
+                    <button class="btn-sm btn-outline-sm" onclick="addNameMapping()" aria-label="Add name mapping">Add</button>
+                    <div class="mapping-list" id="mappingList" role="list" aria-label="Saved name mappings"></div>
                 </div>
             </div>
         </div>
@@ -445,30 +133,48 @@
         <!-- Right Panel -->
         <div class="right">
             <div id="emptyState" class="empty-state">
-                <div class="empty-state-icon">&#128203;</div>
+                <div class="empty-state-illustration">
+                    <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Receipt/document illustration -->
+                        <rect x="25" y="10" width="70" height="90" rx="8" fill="#F3EEFA" stroke="#9B72CF" stroke-width="2"/>
+                        <rect x="35" y="25" width="40" height="4" rx="2" fill="#C9A0E8"/>
+                        <rect x="35" y="35" width="50" height="3" rx="1.5" fill="#E8B4D0" opacity=".6"/>
+                        <rect x="35" y="43" width="45" height="3" rx="1.5" fill="#E8B4D0" opacity=".6"/>
+                        <rect x="35" y="51" width="50" height="3" rx="1.5" fill="#E8B4D0" opacity=".6"/>
+                        <rect x="35" y="63" width="30" height="4" rx="2" fill="#9B72CF" opacity=".5"/>
+                        <rect x="55" y="63" width="30" height="4" rx="2" fill="#7EC8A0" opacity=".5"/>
+                        <rect x="35" y="75" width="50" height="3" rx="1.5" fill="#E8B4D0" opacity=".4"/>
+                        <rect x="35" y="83" width="35" height="3" rx="1.5" fill="#E8B4D0" opacity=".4"/>
+                        <!-- Sparkle -->
+                        <circle cx="98" cy="20" r="4" fill="#E8B4D0" opacity=".7"/>
+                        <circle cx="15" cy="55" r="3" fill="#C9A0E8" opacity=".5"/>
+                        <path d="M105 40l3-8 3 8-8 3 8 3" stroke="#9B72CF" stroke-width="1.5" fill="none" opacity=".5"/>
+                    </svg>
+                </div>
                 <p>Upload receipt images and<br>start OCR analysis</p>
+                <div class="empty-hint">Drag & drop, click, or Ctrl+V to paste</div>
             </div>
 
             <div id="dataView" style="display:none">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
                     <h2 style="font-size:17px;font-weight:700;color:var(--primary);font-family:'Quicksand',sans-serif">OCR Results</h2>
                     <div style="display:flex;gap:6px">
-                        <button class="btn btn-outline" onclick="addRow()">+ Add Row</button>
-                        <button class="btn btn-primary" onclick="sortData()">Sort by Date</button>
+                        <button class="btn btn-outline" onclick="addRow()" aria-label="Add new data row">+ Add Row</button>
+                        <button class="btn btn-primary" onclick="sortData()" aria-label="Sort data by date">Sort by Date</button>
                     </div>
                 </div>
 
                 <div class="data-table-wrap">
-                    <table class="data-table" id="dataTable">
+                    <table class="data-table" id="dataTable" aria-label="OCR extracted data">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Original Name</th>
-                                <th>Korean Name</th>
-                                <th>Description</th>
-                                <th>Qty</th>
-                                <th>Amount (JPY)</th>
-                                <th></th>
+                                <th scope="col">Date</th>
+                                <th scope="col">Original Name</th>
+                                <th scope="col">Korean Name</th>
+                                <th scope="col">Description</th>
+                                <th scope="col">Qty</th>
+                                <th scope="col">Amount (JPY)</th>
+                                <th scope="col"><span class="sr-only">Actions</span></th>
                             </tr>
                         </thead>
                         <tbody id="dataBody"></tbody>
@@ -476,7 +182,7 @@
                 </div>
 
                 <div style="margin-top:14px;text-align:right">
-                    <strong id="totalDisplay" style="font-size:15px;color:var(--primary);font-family:'Quicksand',sans-serif"></strong>
+                    <strong id="totalDisplay" style="font-size:15px;color:var(--primary);font-family:'Quicksand',sans-serif" aria-live="polite"></strong>
                 </div>
             </div>
         </div>
@@ -488,6 +194,7 @@
         let uploadedImages = [];
         let ocrResults = [];
         let currentApi = 'claude';
+        let petalInterval = null;
 
         const API_CONFIG = {
             claude: { label:'Claude', placeholder:'Claude API Key (sk-ant-...)', storageKey:'claude_api_key' },
@@ -502,7 +209,33 @@
             { text:'Almost done!', sub:'Final verification in progress' },
         ];
 
-        // ===== Falling Lily Petals =====
+        // ===== Error messages (Korean-friendly) =====
+        const ERROR_MESSAGES = {
+            'invalid_api_key': 'API 키가 유효하지 않습니다. 키를 확인해주세요.',
+            'rate_limit': 'API 호출 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
+            'network': '네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.',
+            'parse': 'AI 응답을 분석할 수 없습니다. 이미지가 선명한지 확인해주세요.',
+            'empty': '추출된 데이터가 없습니다. 올바른 청구서 이미지인지 확인해주세요.',
+            'no_key': 'API 키를 입력해주세요.',
+            'no_images': '이미지를 업로드해주세요.',
+            'no_rate': '환율을 입력해주세요.',
+            'both_names': '로마자 이름과 한국어 이름 모두 입력해주세요.',
+        };
+
+        function friendlyError(err) {
+            const msg = err.message || '';
+            if (msg.includes('401') || msg.includes('invalid') || msg.includes('Unauthorized'))
+                return ERROR_MESSAGES.invalid_api_key;
+            if (msg.includes('429') || msg.includes('rate') || msg.includes('quota'))
+                return ERROR_MESSAGES.rate_limit;
+            if (msg.includes('network') || msg.includes('fetch') || msg.includes('Failed'))
+                return ERROR_MESSAGES.network;
+            if (msg.includes('JSON') || msg.includes('parse'))
+                return ERROR_MESSAGES.parse;
+            return msg;
+        }
+
+        // ===== Falling Lily Petals (with visibility management) =====
         function createPetals() {
             const container = document.getElementById('petalContainer');
             const petalSVGs = [
@@ -511,6 +244,7 @@
                 `<svg width="14" height="18" viewBox="0 0 14 18"><ellipse cx="7" cy="9" rx="7" ry="9" fill="rgba(179,136,232,.25)"/></svg>`,
             ];
             function spawnPetal() {
+                if (document.hidden) return;
                 const petal = document.createElement('div');
                 petal.className = 'petal';
                 petal.innerHTML = petalSVGs[Math.floor(Math.random() * petalSVGs.length)];
@@ -522,11 +256,21 @@
                 container.appendChild(petal);
                 setTimeout(() => petal.remove(), duration * 1000);
             }
-            setInterval(spawnPetal, 2500);
+            petalInterval = setInterval(spawnPetal, 2500);
             for (let i = 0; i < 5; i++) setTimeout(spawnPetal, i * 800);
+
+            // Pause petals when tab is hidden
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    clearInterval(petalInterval);
+                    petalInterval = null;
+                } else {
+                    if (!petalInterval) petalInterval = setInterval(spawnPetal, 2500);
+                }
+            });
         }
 
-        // ===== Lily Bloom Celebration =====
+        // ===== Bloom Celebration =====
         function showLilyBloom(text) {
             const overlay = document.createElement('div');
             overlay.className = 'bloom-overlay';
@@ -566,6 +310,11 @@
             dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
             fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
+            // Keyboard accessibility for settings toggle
+            document.querySelector('.settings-toggle').addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSettings(); }
+            });
+
             // Ctrl+V clipboard paste
             document.addEventListener('paste', e => {
                 const items = e.clipboardData?.items;
@@ -589,9 +338,12 @@
         // ===== Settings =====
         function toggleSettings() {
             const panel = document.getElementById('settingsPanel');
+            const toggle = document.querySelector('.settings-toggle');
             const arrow = document.getElementById('settingsArrow');
             panel.classList.toggle('open');
-            arrow.innerHTML = panel.classList.contains('open') ? '&#9650;' : '&#9660;';
+            const isOpen = panel.classList.contains('open');
+            arrow.innerHTML = isOpen ? '&#9650;' : '&#9660;';
+            toggle.setAttribute('aria-expanded', isOpen);
         }
 
         // ===== API =====
@@ -599,7 +351,11 @@
             currentApi = api;
             const config = API_CONFIG[api];
             const input = document.getElementById('apiKey');
-            document.querySelectorAll('.api-tab').forEach(t => t.classList.toggle('active', t.dataset.api === api));
+            document.querySelectorAll('.api-tab').forEach(t => {
+                const isActive = t.dataset.api === api;
+                t.classList.toggle('active', isActive);
+                t.setAttribute('aria-selected', isActive);
+            });
             input.placeholder = config.placeholder;
             input.value = localStorage.getItem(config.storageKey) || '';
             input.type = 'password';
@@ -624,7 +380,7 @@
                     updateOcrButton();
                     if (added === 1) {
                         spawnParticles(document.getElementById('dropZone'));
-                        showStatus(`${files.length} image(s) pasted from clipboard!`, 'success');
+                        showStatus(`${files.length}개 이미지가 클립보드에서 붙여넣기 되었습니다.`, 'success');
                         const dz = document.getElementById('dropZone');
                         dz.classList.add('drag-over');
                         setTimeout(() => dz.classList.remove('drag-over'), 600);
@@ -639,7 +395,7 @@
             for (const file of files) {
                 if (file.type === 'application/pdf') {
                     try {
-                        showStatus('Converting PDF to images...', 'info');
+                        showStatus('PDF를 이미지로 변환 중...', 'info');
                         const pdfImages = await pdfToImages(file);
                         for (const img of pdfImages) {
                             uploadedImages.push(img);
@@ -647,10 +403,10 @@
                         }
                         renderThumbnails();
                         updateOcrButton();
-                        showStatus(`${pdfImages.length} pages converted from PDF!`, 'success');
+                        showStatus(`PDF에서 ${pdfImages.length}페이지가 변환되었습니다.`, 'success');
                         if (added > 0) spawnParticles(document.getElementById('dropZone'));
                     } catch (err) {
-                        showStatus(`PDF error: ${err.message}`, 'error');
+                        showStatus(`PDF 오류: ${friendlyError(err)}`, 'error');
                     }
                 } else if (file.type.match(/image\/(png|jpeg|jpg|webp)/)) {
                     const reader = new FileReader();
@@ -695,10 +451,11 @@
             uploadedImages.forEach((img, i) => {
                 const d = document.createElement('div');
                 d.className = 'thumb';
-                d.innerHTML = `<img src="${img.dataUrl}" alt="receipt ${i+1}"><button class="thumb-remove" onclick="removeImage(${i})">&#10005;</button>`;
+                d.setAttribute('role', 'listitem');
+                d.innerHTML = `<img src="${img.dataUrl}" alt="영수증 ${i+1}"><button class="thumb-remove" onclick="removeImage(${i})" aria-label="이미지 ${i+1} 삭제">&#10005;</button>`;
                 c.appendChild(d);
             });
-            document.getElementById('fileCount').textContent = uploadedImages.length > 0 ? `${uploadedImages.length} file(s) selected` : '';
+            document.getElementById('fileCount').textContent = uploadedImages.length > 0 ? `${uploadedImages.length}개 파일 선택됨` : '';
         }
 
         function removeImage(i) { uploadedImages.splice(i, 1); renderThumbnails(); updateOcrButton(); }
@@ -707,7 +464,7 @@
             document.getElementById('ocrBtn').disabled = uploadedImages.length === 0 || !document.getElementById('apiKey').value.trim();
         }
 
-        // ===== Particle effect (lily themed) =====
+        // ===== Particle effect =====
         function spawnParticles(el) {
             const rect = el.getBoundingClientRect();
             const cx = rect.left + rect.width / 2;
@@ -758,8 +515,8 @@
         // ===== OCR =====
         async function startOCR() {
             const apiKey = document.getElementById('apiKey').value.trim();
-            if (!apiKey) { alert(`Please enter ${API_CONFIG[currentApi].label} API Key.`); return; }
-            if (uploadedImages.length === 0) { alert('Please upload images.'); return; }
+            if (!apiKey) { alert(ERROR_MESSAGES.no_key); return; }
+            if (uploadedImages.length === 0) { alert(ERROR_MESSAGES.no_images); return; }
 
             const ocrBtn = document.getElementById('ocrBtn');
             ocrBtn.disabled = true;
@@ -775,7 +532,7 @@
                     if (result.rows) allRows = allRows.concat(result.rows);
                 } catch (err) {
                     hideLoading();
-                    showStatus(`OCR Error (image ${i+1}): ${err.message}`, 'error');
+                    showStatus(`OCR 오류 (이미지 ${i+1}): ${friendlyError(err)}`, 'error');
                     ocrBtn.disabled = false;
                     return;
                 }
@@ -783,7 +540,7 @@
             hideLoading();
 
             if (allRows.length === 0) {
-                showStatus('No data extracted.', 'error');
+                showStatus(ERROR_MESSAGES.empty, 'error');
                 ocrBtn.disabled = false;
                 return;
             }
@@ -817,8 +574,8 @@
             });
 
             spawnParticles(ocrBtn);
-            showLilyBloom(`${ocrResults.length} items extracted!`);
-            showStatus(`&#10047; ${ocrResults.length} records extracted successfully!`, 'success');
+            showLilyBloom(`${ocrResults.length}건 추출 완료!`);
+            showStatus(`&#10047; ${ocrResults.length}건의 데이터가 성공적으로 추출되었습니다.`, 'success');
             ocrBtn.disabled = false;
 
             renderDataTable();
@@ -839,7 +596,7 @@
             else if (currentApi === 'gemini') text = await callGemini(apiKey, base64Data, actualMimeType, prompt);
             else if (currentApi === 'openai') text = await callOpenAI(apiKey, dataUrl, prompt);
 
-            if (!text) throw new Error('API response is empty.');
+            if (!text) throw new Error('API 응답이 비어 있습니다.');
 
             try { return JSON.parse(text); }
             catch (e) {
@@ -847,7 +604,7 @@
                 if (b) return JSON.parse(b[1]);
                 const m = text.match(/\{[\s\S]*\}/);
                 if (m) return JSON.parse(m[0]);
-                throw new Error('JSON parsing failed');
+                throw new Error('JSON 파싱에 실패했습니다.');
             }
         }
 
@@ -862,7 +619,7 @@
                     { type:'text', text:prompt }
                 ]}], temperature:0.1 })
             });
-            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `Claude API Error (${r.status})`); }
+            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `Claude API 오류 (${r.status})`); }
             const d = await r.json(); return d.content?.[0]?.text;
         }
 
@@ -871,7 +628,7 @@
                 method:'POST', headers:{ 'Content-Type':'application/json' },
                 body: JSON.stringify({ contents:[{ parts:[{ inlineData:{ mimeType, data:base64Data } },{ text:prompt }] }], generationConfig:{ responseMimeType:'application/json', temperature:0.1 } })
             });
-            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `Gemini API Error (${r.status})`); }
+            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `Gemini API 오류 (${r.status})`); }
             const d = await r.json(); return d.candidates?.[0]?.content?.parts?.[0]?.text;
         }
 
@@ -883,7 +640,7 @@
                     { type:'text', text:prompt }
                 ]}], temperature:0.1 })
             });
-            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `OpenAI API Error (${r.status})`); }
+            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `OpenAI API 오류 (${r.status})`); }
             const d = await r.json(); return d.choices?.[0]?.message?.content;
         }
 
@@ -893,7 +650,7 @@
             tbody.innerHTML = '';
 
             if (ocrResults.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No data.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">데이터가 없습니다.</td></tr>`;
                 document.getElementById('totalDisplay').textContent = '';
                 return;
             }
@@ -903,13 +660,13 @@
                 const nameClass = row.nameConfidence === 'unknown' ? 'unknown-cell' : '';
 
                 tr.innerHTML = `
-                    <td><input type="text" value="${row.dateDisplay}" style="width:150px;font-size:12px" onchange="updateRow(${i},'dateDisplay',this.value)" placeholder="레이와○년-MM-DD"></td>
-                    <td style="font-size:11px;color:var(--muted)">${row.originalName}</td>
-                    <td class="${nameClass}"><input class="name-input" value="${row.koreanName}" placeholder="Korean name" onchange="updateRow(${i},'koreanName',this.value)"></td>
-                    <td><input class="service-input" value="${row.koreanService}" onchange="updateRow(${i},'koreanService',this.value)"></td>
-                    <td><input type="number" class="amount-input" value="${row.vehicleCount}" min="1" style="width:45px" onchange="updateRow(${i},'vehicleCount',this.value)"></td>
-                    <td><input type="number" class="amount-input" value="${row.amount}" onchange="updateRow(${i},'amount',this.value)"></td>
-                    <td><button class="row-btn row-btn-del" onclick="deleteRow(${i})">&#10005;</button></td>
+                    <td><input type="text" value="${row.dateDisplay}" style="width:150px;font-size:12px" onchange="updateRow(${i},'dateDisplay',this.value)" placeholder="레이와○년-MM-DD" aria-label="날짜 ${i+1}"></td>
+                    <td style="font-size:12px;color:var(--muted)">${row.originalName}</td>
+                    <td class="${nameClass}"><input class="name-input" value="${row.koreanName}" placeholder="한국어 이름" onchange="updateRow(${i},'koreanName',this.value)" aria-label="한국어 이름 ${i+1}"></td>
+                    <td><input class="service-input" value="${row.koreanService}" onchange="updateRow(${i},'koreanService',this.value)" aria-label="서비스 내용 ${i+1}"></td>
+                    <td><input type="number" class="amount-input" value="${row.vehicleCount}" min="1" style="width:45px" onchange="updateRow(${i},'vehicleCount',this.value)" aria-label="대수 ${i+1}"></td>
+                    <td><input type="number" class="amount-input" value="${row.amount}" onchange="updateRow(${i},'amount',this.value)" aria-label="금액 ${i+1}"></td>
+                    <td><button class="row-btn row-btn-del" onclick="deleteRow(${i})" aria-label="행 ${i+1} 삭제">&#10005;</button></td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -974,19 +731,19 @@
             const month = parseInt(document.getElementById('month').value);
             const rate = parseFloat(document.getElementById('exchangeRate').value) || 0;
             const fee = parseFloat(document.getElementById('remittanceFee').value) || 0;
-            if (!rate) { alert('Please enter exchange rate.'); return; }
+            if (!rate) { alert(ERROR_MESSAGES.no_rate); return; }
 
             const btn = document.getElementById('excelBtn');
             btn.classList.add('downloading');
             setTimeout(() => btn.classList.remove('downloading'), 700);
             spawnParticles(btn);
-            showLilyBloom('Excel downloaded!');
+            showLilyBloom('엑셀 다운로드 완료!');
 
             const wb = XLSX.utils.book_new();
             const ws = buildSheet(month, ocrResults, rate, fee);
             XLSX.utils.book_append_sheet(wb, ws, `미쯔이${month}월`);
             XLSX.writeFile(wb, `미쯔이택시_${month}월_정산.xlsx`);
-            showStatus('&#10047; Excel file downloaded!', 'success');
+            showStatus('&#10047; 엑셀 파일이 다운로드되었습니다.', 'success');
         }
 
         function buildSheet(month, data, rate, fee) {
@@ -1037,7 +794,7 @@
         function addNameMapping() {
             const roman = document.getElementById('newNameRoman').value.trim().toUpperCase();
             const korean = document.getElementById('newNameKorean').value.trim();
-            if (!roman || !korean) { alert('Please enter both romanized and Korean names.'); return; }
+            if (!roman || !korean) { alert(ERROR_MESSAGES.both_names); return; }
             const m = JSON.parse(localStorage.getItem('user_name_map') || '{}');
             m[roman] = korean;
             localStorage.setItem('user_name_map', JSON.stringify(m));
@@ -1062,8 +819,8 @@
             const c = document.getElementById('mappingList');
             const m = JSON.parse(localStorage.getItem('user_name_map') || '{}');
             const e = Object.entries(m);
-            if (e.length === 0) { c.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">No saved mappings</div>'; return; }
-            c.innerHTML = e.map(([k,v]) => `<div class="mapping-item"><span>${k}</span><span style="font-weight:600">${v}</span><button class="row-btn row-btn-del" onclick="removeNameMapping('${k}')" style="flex:none">&#10005;</button></div>`).join('');
+            if (e.length === 0) { c.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0">저장된 매핑이 없습니다</div>'; return; }
+            c.innerHTML = e.map(([k,v]) => `<div class="mapping-item" role="listitem"><span>${k}</span><span style="font-weight:600">${v}</span><button class="row-btn row-btn-del" onclick="removeNameMapping('${k}')" style="flex:none" aria-label="${k} 매핑 삭제">&#10005;</button></div>`).join('');
         }
     </script>
 </body>
