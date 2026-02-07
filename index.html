@@ -6,6 +6,7 @@
     <title>나리 영수증Bot - 택시 정산 자동화</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         :root {
             --primary: #2E86AB;
@@ -202,9 +203,9 @@
                     <div class="drop-zone-icon">&#128206;</div>
                     <div class="drop-zone-text">
                         영수증 이미지를 <strong>드래그</strong>, <strong>클릭</strong> 또는 <strong>Ctrl+V</strong><br>
-                        <small>PNG, JPG 지원 / 여러 장 가능 / 붙여넣기 지원</small>
+                        <small>PNG, JPG, PDF 지원 / 여러 장 가능 / 붙여넣기 지원</small>
                     </div>
-                    <input type="file" id="fileInput" accept="image/*" multiple hidden>
+                    <input type="file" id="fileInput" accept="image/*,application/pdf" multiple hidden>
                 </div>
                 <div class="thumbnails" id="thumbnails"></div>
                 <div class="file-count" id="fileCount"></div>
@@ -458,20 +459,62 @@
             }
         }
 
-        function handleFiles(files) {
+        async function handleFiles(files) {
             let added = 0;
             for (const file of files) {
-                if (!file.type.match(/image\/(png|jpeg|jpg|webp)/)) continue;
-                const reader = new FileReader();
-                reader.onload = e => {
-                    uploadedImages.push({ file, dataUrl: e.target.result });
-                    added++;
-                    renderThumbnails();
-                    updateOcrButton();
-                    if (added === 1) spawnParticles(document.getElementById('dropZone'));
-                };
-                reader.readAsDataURL(file);
+                if (file.type === 'application/pdf') {
+                    // PDF → 이미지 변환
+                    try {
+                        showStatus('PDF를 이미지로 변환 중...', 'info');
+                        const pdfImages = await pdfToImages(file);
+                        for (const img of pdfImages) {
+                            uploadedImages.push(img);
+                            added++;
+                        }
+                        renderThumbnails();
+                        updateOcrButton();
+                        showStatus(`PDF에서 ${pdfImages.length}페이지 변환 완료!`, 'success');
+                        if (added > 0) spawnParticles(document.getElementById('dropZone'));
+                    } catch (err) {
+                        showStatus(`PDF 변환 오류: ${err.message}`, 'error');
+                    }
+                } else if (file.type.match(/image\/(png|jpeg|jpg|webp)/)) {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        uploadedImages.push({ file, dataUrl: e.target.result });
+                        added++;
+                        renderThumbnails();
+                        updateOcrButton();
+                        if (added === 1) spawnParticles(document.getElementById('dropZone'));
+                    };
+                    reader.readAsDataURL(file);
+                }
             }
+        }
+
+        // PDF → 이미지 변환 (pdf.js)
+        async function pdfToImages(file) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const images = [];
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const scale = 2.0; // 고해상도
+                const viewport = page.getViewport({ scale });
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+                await page.render({ canvasContext: ctx, viewport }).promise;
+                const dataUrl = canvas.toDataURL('image/png');
+                images.push({
+                    file: new File([await (await fetch(dataUrl)).blob()], `${file.name}_page${i}.png`, { type: 'image/png' }),
+                    dataUrl
+                });
+            }
+            return images;
         }
 
         function renderThumbnails() {
@@ -595,8 +638,7 @@
                 };
             });
 
-            // 날짜순 정렬 (이미지 순서 = 날짜순)
-            ocrResults.sort((a, b) => a.excelSerial - b.excelSerial);
+            // 원본 순서 그대로 유지 (자동 정렬 안 함)
 
             spawnParticles(ocrBtn);
             showStatus(`${ocrResults.length}건의 데이터를 추출했습니다!`, 'success');
@@ -770,8 +812,7 @@
             spawnParticles(btn);
 
             const wb = XLSX.utils.book_new();
-            const sorted = [...ocrResults].sort((a, b) => a.excelSerial - b.excelSerial);
-            const ws = buildSheet(month, sorted, rate, fee);
+            const ws = buildSheet(month, ocrResults, rate, fee);
             XLSX.utils.book_append_sheet(wb, ws, `미쯔이${month}월`);
             XLSX.writeFile(wb, `미쯔이택시_${month}월_정산.xlsx`);
             showStatus('엑셀 파일이 다운로드되었습니다!', 'success');
