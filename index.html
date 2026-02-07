@@ -334,16 +334,16 @@
         <!-- Left Panel -->
         <div class="left">
             <div class="left-header">
-                <h1>&#127804; Lily's Receipt Bot</h1>
+                <h1>&#127799; Lily's Receipt Bot</h1>
                 <p>Japanese Taxi Invoice Auto Settlement</p>
             </div>
 
             <div class="main-actions">
                 <!-- Upload -->
                 <div class="drop-zone" id="dropZone">
-                    <div class="drop-zone-icon">&#127804;</div>
+                    <div class="drop-zone-icon">&#128206;</div>
                     <div class="drop-zone-text">
-                        &#127804; <strong>Drag</strong>, <strong>Click</strong> or <strong>Ctrl+V</strong><br>
+                        <strong>Drag</strong>, <strong>Click</strong> or <strong>Ctrl+V</strong><br>
                         <small>PNG, JPG, PDF / Multiple files / Paste supported</small>
                     </div>
                     <input type="file" id="fileInput" accept="image/*,application/pdf" multiple hidden>
@@ -354,7 +354,7 @@
                 <!-- Settings -->
                 <div class="input-row">
                     <div class="input-group">
-                        <label>&#127804; Month</label>
+                        <label>Month</label>
                         <select id="month">
                             <option value="1">1</option><option value="2">2</option><option value="3">3</option>
                             <option value="4">4</option><option value="5">5</option><option value="6">6</option>
@@ -378,7 +378,7 @@
 
                 <!-- OCR Button -->
                 <button class="btn-ocr" id="ocrBtn" onclick="startOCR()" disabled>
-                    &#127804; Start OCR Analysis
+                    Start OCR Analysis
                 </button>
 
                 <!-- Loading -->
@@ -403,7 +403,7 @@
                 <div id="downloadSection" style="display:none">
                     <div class="summary" id="summary"></div>
                     <button class="btn-excel" id="excelBtn" onclick="downloadExcel()" style="margin-top:12px">
-                        &#127804; Download Excel
+                        Download Excel
                     </button>
                 </div>
             </div>
@@ -445,13 +445,13 @@
         <!-- Right Panel -->
         <div class="right">
             <div id="emptyState" class="empty-state">
-                <div class="empty-state-icon">&#127804;</div>
-                <p>Upload receipt images and<br>start OCR analysis &#127804;</p>
+                <div class="empty-state-icon">&#128203;</div>
+                <p>Upload receipt images and<br>start OCR analysis</p>
             </div>
 
             <div id="dataView" style="display:none">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-                    <h2 style="font-size:17px;font-weight:700;color:var(--primary);font-family:'Quicksand',sans-serif">&#127804; OCR Results</h2>
+                    <h2 style="font-size:17px;font-weight:700;color:var(--primary);font-family:'Quicksand',sans-serif">OCR Results</h2>
                     <div style="display:flex;gap:6px">
                         <button class="btn btn-outline" onclick="addRow()">+ Add Row</button>
                         <button class="btn btn-primary" onclick="sortData()">Sort by Date</button>
@@ -496,10 +496,10 @@
         };
 
         const LOADING_MESSAGES = [
-            { text:'&#127804; Analyzing receipts...', sub:'AI is reading Japanese text' },
-            { text:'&#127804; Extracting data...', sub:'Finding dates, names, and amounts' },
-            { text:'&#127804; Converting names...', sub:'Translating romaji to Korean' },
-            { text:'&#127804; Almost done!', sub:'Final verification in progress' },
+            { text:'Analyzing receipts...', sub:'AI is reading Japanese text' },
+            { text:'Extracting data...', sub:'Finding dates, names, and amounts' },
+            { text:'Converting names...', sub:'Translating romaji to Korean' },
+            { text:'Almost done!', sub:'Final verification in progress' },
         ];
 
         // ===== Falling Lily Petals =====
@@ -531,7 +531,7 @@
             const overlay = document.createElement('div');
             overlay.className = 'bloom-overlay';
             overlay.innerHTML = `
-                <div class="bloom-lily">&#127804;</div>
+                <div class="bloom-lily">&#127799;</div>
                 <div class="bloom-text">${text}</div>
             `;
             document.body.appendChild(overlay);
@@ -624,7 +624,7 @@
                     updateOcrButton();
                     if (added === 1) {
                         spawnParticles(document.getElementById('dropZone'));
-                        showStatus(`&#127804; ${files.length} image(s) pasted from clipboard!`, 'success');
+                        showStatus(`${files.length} image(s) pasted from clipboard!`, 'success');
                         const dz = document.getElementById('dropZone');
                         dz.classList.add('drag-over');
                         setTimeout(() => dz.classList.remove('drag-over'), 600);
@@ -639,7 +639,7 @@
             for (const file of files) {
                 if (file.type === 'application/pdf') {
                     try {
-                        showStatus('&#127804; Converting PDF to images...', 'info');
+                        showStatus('Converting PDF to images...', 'info');
                         const pdfImages = await pdfToImages(file);
                         for (const img of pdfImages) {
                             uploadedImages.push(img);
@@ -647,7 +647,7 @@
                         }
                         renderThumbnails();
                         updateOcrButton();
-                        showStatus(`&#127804; ${pdfImages.length} pages converted from PDF!`, 'success');
+                        showStatus(`${pdfImages.length} pages converted from PDF!`, 'success');
                         if (added > 0) spawnParticles(document.getElementById('dropZone'));
                     } catch (err) {
                         showStatus(`PDF error: ${err.message}`, 'error');
@@ -698,7 +698,7 @@
                 d.innerHTML = `<img src="${img.dataUrl}" alt="receipt ${i+1}"><button class="thumb-remove" onclick="removeImage(${i})">&#10005;</button>`;
                 c.appendChild(d);
             });
-            document.getElementById('fileCount').textContent = uploadedImages.length > 0 ? `&#127804; ${uploadedImages.length} file(s) selected` : '';
+            document.getElementById('fileCount').textContent = uploadedImages.length > 0 ? `${uploadedImages.length} file(s) selected` : '';
         }
 
         function removeImage(i) { uploadedImages.splice(i, 1); renderThumbnails(); updateOcrButton(); }
@@ -818,7 +818,7 @@
 
             spawnParticles(ocrBtn);
             showLilyBloom(`${ocrResults.length} items extracted!`);
-            showStatus(`&#127804; ${ocrResults.length} records extracted successfully!`, 'success');
+            showStatus(`&#10047; ${ocrResults.length} records extracted successfully!`, 'success');
             ocrBtn.disabled = false;
 
             renderDataTable();
@@ -915,7 +915,7 @@
             });
 
             const total = ocrResults.reduce((s, r) => s + Number(r.amount), 0);
-            document.getElementById('totalDisplay').innerHTML = `&#127804; Total: ${total.toLocaleString()} JPY`;
+            document.getElementById('totalDisplay').innerHTML = `Total: ${total.toLocaleString()} JPY`;
         }
 
         function updateRow(index, field, value) {
@@ -963,10 +963,10 @@
             const total = ocrResults.reduce((s, r) => s + Number(r.amount), 0);
             const count = ocrResults.length;
             document.getElementById('summary').innerHTML = `
-                <div class="summary-item"><div class="summary-value">${count}</div><div class="summary-label">&#127804; Total Records</div></div>
-                <div class="summary-item"><div class="summary-value">${total.toLocaleString()}</div><div class="summary-label">&#127804; Total (JPY)</div></div>
+                <div class="summary-item"><div class="summary-value">${count}</div><div class="summary-label">Total Records</div></div>
+                <div class="summary-item"><div class="summary-value">${total.toLocaleString()}</div><div class="summary-label">Total (JPY)</div></div>
             `;
-            document.getElementById('totalDisplay').innerHTML = `&#127804; Total: ${total.toLocaleString()} JPY`;
+            document.getElementById('totalDisplay').innerHTML = `Total: ${total.toLocaleString()} JPY`;
         }
 
         // ===== Excel =====
@@ -986,7 +986,7 @@
             const ws = buildSheet(month, ocrResults, rate, fee);
             XLSX.utils.book_append_sheet(wb, ws, `미쯔이${month}월`);
             XLSX.writeFile(wb, `미쯔이택시_${month}월_정산.xlsx`);
-            showStatus('&#127804; Excel file downloaded!', 'success');
+            showStatus('&#10047; Excel file downloaded!', 'success');
         }
 
         function buildSheet(month, data, rate, fee) {
