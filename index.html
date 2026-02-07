@@ -618,16 +618,36 @@
                 return;
             }
 
-            const year = parseInt(document.getElementById('year').value);
-            if (reiwaYear) document.getElementById('year').value = REIWA_OFFSET + reiwaYear;
+            // 서기 연도 결정
+            const inputYear = parseInt(document.getElementById('year').value);
+            let gregorianYear = inputYear;
+            if (reiwaYear) {
+                gregorianYear = REIWA_OFFSET + reiwaYear;
+                document.getElementById('year').value = gregorianYear;
+            }
 
             ocrResults = allRows.map(row => {
-                const ry = reiwaYear || (year - REIWA_OFFSET);
+                let year, month, day;
+
+                // AI가 서기 날짜(yyyy-mm-dd)를 직접 반환한 경우
+                if (row.date && typeof row.date === 'string' && row.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    const parts = row.date.split('-');
+                    year = parseInt(parts[0]);
+                    month = parseInt(parts[1]);
+                    day = parseInt(parts[2]);
+                } else {
+                    // 구 형식 호환 (month/day만 있는 경우)
+                    month = row.month;
+                    day = row.day;
+                    year = gregorianYear || latestYear;
+                }
+
+                const ry = year - REIWA_OFFSET;
                 const nameResult = findKoreanName(row.customer_name || '');
                 return {
-                    month: row.month, day: row.day,
-                    date: reiwaToDate(ry, row.month, row.day),
-                    excelSerial: reiwaToExcelSerial(ry, row.month, row.day),
+                    month, day, year,
+                    date: new Date(year, month - 1, day),
+                    excelSerial: reiwaToExcelSerial(ry, month, day),
                     originalName: (row.customer_name || '').replace(/様$/g, '').trim(),
                     koreanName: nameResult.name || '',
                     nameConfidence: nameResult.confidence,
@@ -724,8 +744,8 @@
             ocrResults.forEach((row, i) => {
                 const tr = document.createElement('tr');
                 const nameClass = row.nameConfidence === 'unknown' ? 'unknown-cell' : '';
-                const year = parseInt(document.getElementById('year').value);
-                const dateStr = `${year}-${String(row.month).padStart(2,'0')}-${String(row.day).padStart(2,'0')}`;
+                const rowYear = row.year || parseInt(document.getElementById('year').value);
+                const dateStr = `${rowYear}-${String(row.month).padStart(2,'0')}-${String(row.day).padStart(2,'0')}`;
 
                 tr.innerHTML = `
                     <td><input type="date" value="${dateStr}" style="width:125px" onchange="updateRowDate(${i},this.value)"></td>
@@ -748,9 +768,10 @@
             if (p.length !== 3) return;
             const year = parseInt(p[0]), month = parseInt(p[1]), day = parseInt(p[2]);
             const ry = year - REIWA_OFFSET;
+            ocrResults[index].year = year;
             ocrResults[index].month = month;
             ocrResults[index].day = day;
-            ocrResults[index].date = reiwaToDate(ry, month, day);
+            ocrResults[index].date = new Date(year, month - 1, day);
             ocrResults[index].excelSerial = reiwaToExcelSerial(ry, month, day);
             updateSummary();
         }
