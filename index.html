@@ -201,8 +201,8 @@
                 <div class="drop-zone" id="dropZone">
                     <div class="drop-zone-icon">&#128206;</div>
                     <div class="drop-zone-text">
-                        영수증 이미지를 <strong>드래그</strong> 또는 <strong>클릭</strong><br>
-                        <small>PNG, JPG 지원 / 여러 장 가능</small>
+                        영수증 이미지를 <strong>드래그</strong>, <strong>클릭</strong> 또는 <strong>Ctrl+V</strong><br>
+                        <small>PNG, JPG 지원 / 여러 장 가능 / 붙여넣기 지원</small>
                     </div>
                     <input type="file" id="fileInput" accept="image/*" multiple hidden>
                 </div>
@@ -389,6 +389,23 @@
             dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
             fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
+            // Ctrl+V 클립보드 붙여넣기
+            document.addEventListener('paste', e => {
+                const items = e.clipboardData?.items;
+                if (!items) return;
+                const imageFiles = [];
+                for (const item of items) {
+                    if (item.type.startsWith('image/')) {
+                        const file = item.getAsFile();
+                        if (file) imageFiles.push(file);
+                    }
+                }
+                if (imageFiles.length > 0) {
+                    e.preventDefault();
+                    handlePastedImages(imageFiles);
+                }
+            });
+
             renderMappings();
         });
 
@@ -419,6 +436,28 @@
         }
 
         // ===== 파일 처리 =====
+        function handlePastedImages(files) {
+            let added = 0;
+            for (const file of files) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    uploadedImages.push({ file, dataUrl: e.target.result });
+                    added++;
+                    renderThumbnails();
+                    updateOcrButton();
+                    if (added === 1) {
+                        spawnParticles(document.getElementById('dropZone'));
+                        showStatus(`클립보드에서 이미지 ${files.length}장 붙여넣기 완료!`, 'success');
+                        // 드롭존 깜빡임 효과
+                        const dz = document.getElementById('dropZone');
+                        dz.classList.add('drag-over');
+                        setTimeout(() => dz.classList.remove('drag-over'), 600);
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
         function handleFiles(files) {
             let added = 0;
             for (const file of files) {
