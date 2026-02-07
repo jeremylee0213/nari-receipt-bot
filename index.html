@@ -595,13 +595,11 @@
 
             ocrResults = [];
             let allRows = [];
-            let reiwaYear = null;
 
             for (let i = 0; i < uploadedImages.length; i++) {
                 showLoading(i, uploadedImages.length);
                 try {
                     const result = await callOCR(apiKey, uploadedImages[i].dataUrl, uploadedImages[i].file.type);
-                    if (result.reiwa_year) reiwaYear = result.reiwa_year;
                     if (result.rows) allRows = allRows.concat(result.rows);
                 } catch (err) {
                     hideLoading();
@@ -618,36 +616,24 @@
                 return;
             }
 
-            // 서기 연도 결정
-            const inputYear = parseInt(document.getElementById('year').value);
-            let gregorianYear = inputYear;
-            if (reiwaYear) {
-                gregorianYear = REIWA_OFFSET + reiwaYear;
-                document.getElementById('year').value = gregorianYear;
-            }
-
             ocrResults = allRows.map(row => {
-                let year, month, day;
+                const nameResult = findKoreanName(row.customer_name || '');
+                // 날짜: 원본 그대로 텍스트 (예: "레이와8년 1월 15일")
+                const dateText = row.date || '';
 
-                // AI가 서기 날짜(yyyy-mm-dd)를 직접 반환한 경우
-                if (row.date && typeof row.date === 'string' && row.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                    const parts = row.date.split('-');
-                    year = parseInt(parts[0]);
-                    month = parseInt(parts[1]);
-                    day = parseInt(parts[2]);
-                } else {
-                    // 구 형식 호환 (month/day만 있는 경우)
-                    month = row.month;
-                    day = row.day;
-                    year = gregorianYear || latestYear;
+                // 엑셀용: 날짜 텍스트에서 숫자 추출 시도
+                let excelSerial = null;
+                const dateMatch = dateText.match(/(\d+)년\s*(\d+)월\s*(\d+)일/);
+                if (dateMatch) {
+                    const ry = parseInt(dateMatch[1]);
+                    const m = parseInt(dateMatch[2]);
+                    const d = parseInt(dateMatch[3]);
+                    excelSerial = reiwaToExcelSerial(ry, m, d);
                 }
 
-                const ry = year - REIWA_OFFSET;
-                const nameResult = findKoreanName(row.customer_name || '');
                 return {
-                    month, day, year,
-                    date: new Date(year, month - 1, day),
-                    excelSerial: reiwaToExcelSerial(ry, month, day),
+                    dateText,
+                    excelSerial,
                     originalName: (row.customer_name || '').replace(/様$/g, '').trim(),
                     koreanName: nameResult.name || '',
                     nameConfidence: nameResult.confidence,
@@ -744,11 +730,9 @@
             ocrResults.forEach((row, i) => {
                 const tr = document.createElement('tr');
                 const nameClass = row.nameConfidence === 'unknown' ? 'unknown-cell' : '';
-                const rowYear = row.year || parseInt(document.getElementById('year').value);
-                const dateStr = `${rowYear}-${String(row.month).padStart(2,'0')}-${String(row.day).padStart(2,'0')}`;
 
                 tr.innerHTML = `
-                    <td><input type="date" value="${dateStr}" style="width:125px" onchange="updateRowDate(${i},this.value)"></td>
+                    <td><input type="text" value="${row.dateText}" style="width:140px;font-size:12px" onchange="updateRow(${i},'dateText',this.value)" placeholder="레이와○년 ○월 ○일"></td>
                     <td style="font-size:11px;color:var(--muted)">${row.originalName}</td>
                     <td class="${nameClass}"><input class="name-input" value="${row.koreanName}" placeholder="한국이름" onchange="updateRow(${i},'koreanName',this.value)"></td>
                     <td><input class="service-input" value="${row.koreanService}" onchange="updateRow(${i},'koreanService',this.value)"></td>
@@ -763,22 +747,17 @@
             document.getElementById('totalDisplay').textContent = `합계: ${total.toLocaleString()} 엔`;
         }
 
-        function updateRowDate(index, dateStr) {
-            const p = dateStr.split('-');
-            if (p.length !== 3) return;
-            const year = parseInt(p[0]), month = parseInt(p[1]), day = parseInt(p[2]);
-            const ry = year - REIWA_OFFSET;
-            ocrResults[index].year = year;
-            ocrResults[index].month = month;
-            ocrResults[index].day = day;
-            ocrResults[index].date = new Date(year, month - 1, day);
-            ocrResults[index].excelSerial = reiwaToExcelSerial(ry, month, day);
-            updateSummary();
-        }
-
         function updateRow(index, field, value) {
             if (field === 'vehicleCount') ocrResults[index][field] = parseInt(value) || 1;
             else if (field === 'amount') ocrResults[index][field] = parseFloat(value) || 0;
+            else if (field === 'dateText') {
+                ocrResults[index].dateText = value;
+                // 엑셀용 시리얼 재계산
+                const dateMatch = value.match(/(\d+)년\s*(\d+)월\s*(\d+)일/);
+                if (dateMatch) {
+                    ocrResults[index].excelSerial = reiwaToExcelSerial(parseInt(dateMatch[1]), parseInt(dateMatch[2]), parseInt(dateMatch[3]));
+                }
+            }
             else ocrResults[index][field] = value;
 
             if (field === 'koreanName' && value && ocrResults[index].originalName) {
@@ -797,18 +776,18 @@
         function deleteRow(i) { ocrResults.splice(i, 1); renderDataTable(); updateSummary(); }
 
         function addRow() {
-            const month = parseInt(document.getElementById('month').value);
-            const year = parseInt(document.getElementById('year').value);
-            const ry = year - REIWA_OFFSET;
             ocrResults.push({
-                month, day:1, date:reiwaToDate(ry, month, 1), excelSerial:reiwaToExcelSerial(ry, month, 1),
+                dateText:'', excelSerial:null,
                 originalName:'', koreanName:'', nameConfidence:'unknown',
                 originalService:'', koreanService:'', vehicleCount:1, amount:0,
             });
             renderDataTable();
         }
 
-        function sortData() { ocrResults.sort((a, b) => a.excelSerial - b.excelSerial); renderDataTable(); }
+        function sortData() {
+            ocrResults.sort((a, b) => (a.excelSerial || 99999) - (b.excelSerial || 99999));
+            renderDataTable();
+        }
 
         function updateSummary() {
             const total = ocrResults.reduce((s, r) => s + Number(r.amount), 0);
@@ -862,12 +841,18 @@
 
             data.forEach((row, i) => {
                 const r = 12 + i;
-                ws[`B${r}`] = { v:row.excelSerial, t:'n', s:datS };
+                // 날짜: 엑셀 시리얼이 있으면 날짜 형식, 없으면 텍스트 그대로
+                if (row.excelSerial) {
+                    ws[`B${r}`] = { v:row.excelSerial, t:'n', s:datS };
+                    ws[`H${r}`] = { v:row.excelSerial, t:'n', s:datS };
+                } else {
+                    ws[`B${r}`] = { v:row.dateText || '', s:bdrS };
+                    ws[`H${r}`] = { v:row.dateText || '', s:bdrS };
+                }
                 ws[`C${r}`] = { v:row.koreanName || row.originalName, s:bdrS };
                 ws[`D${r}`] = { v:row.koreanService, s:bdrS };
                 ws[`E${r}`] = { v:Number(row.amount), t:'n', s:{...numS,...bdrS} };
                 ws[`F${r}`] = { v:'엔', s:bdrS };
-                ws[`H${r}`] = { v:row.excelSerial, t:'n', s:datS };
                 ws[`I${r}`] = { v:row.koreanName || row.originalName, s:bdrS };
                 ws[`J${r}`] = i === 0
                     ? { f:`$E$9*E${r}+E8`, t:'n', s:{...numS,...bdrS} }
