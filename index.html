@@ -618,21 +618,22 @@
 
             ocrResults = allRows.map(row => {
                 const nameResult = findKoreanName(row.customer_name || '');
-                // 날짜: 원본 그대로 텍스트 (예: "레이와8년 1월 15일")
-                const dateText = row.date || '';
+                const rawDate = row.date || '';
 
-                // 엑셀용: 날짜 텍스트에서 숫자 추출 시도
+                // "레이와8년 1월 15일" → "레이와8년-01-15" 형식으로 변환
+                let dateDisplay = rawDate;
                 let excelSerial = null;
-                const dateMatch = dateText.match(/(\d+)년\s*(\d+)월\s*(\d+)일/);
+                const dateMatch = rawDate.match(/[레레이와]*(\d+)년\s*(\d+)월\s*(\d+)일/);
                 if (dateMatch) {
                     const ry = parseInt(dateMatch[1]);
                     const m = parseInt(dateMatch[2]);
                     const d = parseInt(dateMatch[3]);
+                    dateDisplay = `레이와${ry}년-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                     excelSerial = reiwaToExcelSerial(ry, m, d);
                 }
 
                 return {
-                    dateText,
+                    dateDisplay,
                     excelSerial,
                     originalName: (row.customer_name || '').replace(/様$/g, '').trim(),
                     koreanName: nameResult.name || '',
@@ -732,7 +733,7 @@
                 const nameClass = row.nameConfidence === 'unknown' ? 'unknown-cell' : '';
 
                 tr.innerHTML = `
-                    <td><input type="text" value="${row.dateText}" style="width:140px;font-size:12px" onchange="updateRow(${i},'dateText',this.value)" placeholder="레이와○년 ○월 ○일"></td>
+                    <td><input type="text" value="${row.dateDisplay}" style="width:150px;font-size:12px" onchange="updateRow(${i},'dateDisplay',this.value)" placeholder="레이와○년-MM-DD"></td>
                     <td style="font-size:11px;color:var(--muted)">${row.originalName}</td>
                     <td class="${nameClass}"><input class="name-input" value="${row.koreanName}" placeholder="한국이름" onchange="updateRow(${i},'koreanName',this.value)"></td>
                     <td><input class="service-input" value="${row.koreanService}" onchange="updateRow(${i},'koreanService',this.value)"></td>
@@ -750,10 +751,10 @@
         function updateRow(index, field, value) {
             if (field === 'vehicleCount') ocrResults[index][field] = parseInt(value) || 1;
             else if (field === 'amount') ocrResults[index][field] = parseFloat(value) || 0;
-            else if (field === 'dateText') {
-                ocrResults[index].dateText = value;
+            else if (field === 'dateDisplay') {
+                ocrResults[index].dateDisplay = value;
                 // 엑셀용 시리얼 재계산
-                const dateMatch = value.match(/(\d+)년\s*(\d+)월\s*(\d+)일/);
+                const dateMatch = value.match(/(\d+)년[^\d]*(\d+)[^\d]*(\d+)/);
                 if (dateMatch) {
                     ocrResults[index].excelSerial = reiwaToExcelSerial(parseInt(dateMatch[1]), parseInt(dateMatch[2]), parseInt(dateMatch[3]));
                 }
@@ -777,7 +778,7 @@
 
         function addRow() {
             ocrResults.push({
-                dateText:'', excelSerial:null,
+                dateDisplay:'', excelSerial:null,
                 originalName:'', koreanName:'', nameConfidence:'unknown',
                 originalService:'', koreanService:'', vehicleCount:1, amount:0,
             });
@@ -841,14 +842,9 @@
 
             data.forEach((row, i) => {
                 const r = 12 + i;
-                // 날짜: 엑셀 시리얼이 있으면 날짜 형식, 없으면 텍스트 그대로
-                if (row.excelSerial) {
-                    ws[`B${r}`] = { v:row.excelSerial, t:'n', s:datS };
-                    ws[`H${r}`] = { v:row.excelSerial, t:'n', s:datS };
-                } else {
-                    ws[`B${r}`] = { v:row.dateText || '', s:bdrS };
-                    ws[`H${r}`] = { v:row.dateText || '', s:bdrS };
-                }
+                // 날짜: 레이와○년-MM-DD 텍스트로 저장
+                ws[`B${r}`] = { v:row.dateDisplay || '', s:bdrS };
+                ws[`H${r}`] = { v:row.dateDisplay || '', s:bdrS };
                 ws[`C${r}`] = { v:row.koreanName || row.originalName, s:bdrS };
                 ws[`D${r}`] = { v:row.koreanService, s:bdrS };
                 ws[`E${r}`] = { v:Number(row.amount), t:'n', s:{...numS,...bdrS} };
