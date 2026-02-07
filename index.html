@@ -3,75 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>나리 영수증Bot - 택시 정산 자동화</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <title>Lily's Receipt Bot</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         :root {
-            --primary: #2E86AB;
-            --primary-light: #E8F4F8;
-            --bg: #F5F7FA;
-            --card: #FFF;
-            --text: #2C3E50;
-            --muted: #7F8C8D;
-            --border: #E0E6ED;
-            --success: #27AE60;
-            --warning: #F39C12;
-            --danger: #E74C3C;
-            --radius: 10px;
+            --primary: #9B72CF;
+            --primary-dark: #7B52AF;
+            --primary-light: #F3EEFA;
+            --primary-glow: rgba(155,114,207,.25);
+            --bg: linear-gradient(135deg, #F8F5FD 0%, #F0E8FA 50%, #EDE4F7 100%);
+            --card: rgba(255,255,255,.72);
+            --card-solid: #FDFCFF;
+            --text: #3D2E5C;
+            --muted: #9A8BB5;
+            --border: rgba(155,114,207,.18);
+            --success: #7EC8A0;
+            --success-dark: #5BA87E;
+            --warning: #E8B86D;
+            --danger: #D97B8F;
+            --radius: 14px;
+            --lily-pink: #E8B4D0;
+            --lily-white: #F5EEF8;
         }
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+        body {
+            font-family:'Noto Sans KR','Quicksand',sans-serif;
+            background:var(--bg); color:var(--text); min-height:100vh;
+            overflow-x:hidden; position:relative;
+        }
 
-        /* ===== 레이아웃 ===== */
-        .app { display:flex; min-height:100vh; max-width:1500px; margin:0 auto; }
-        .left { width:420px; min-width:420px; background:var(--card); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; }
-        .right { flex:1; padding:20px; overflow-y:auto; }
+        /* ===== Falling Lily Petals ===== */
+        .petal-container { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:0; overflow:hidden; }
+        .petal {
+            position:absolute; top:-40px; opacity:0;
+            animation:petal-fall linear forwards;
+        }
+        .petal svg { filter:drop-shadow(0 2px 4px rgba(155,114,207,.15)); }
+        @keyframes petal-fall {
+            0% { opacity:0; transform:translateX(0) rotate(0deg); }
+            10% { opacity:.6; }
+            90% { opacity:.4; }
+            100% { opacity:0; transform:translateX(var(--drift)) rotate(var(--spin)); top:105vh; }
+        }
 
-        /* 왼쪽 상단 헤더 */
-        .left-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); }
-        .left-header h1 { font-size:22px; font-weight:900; color:var(--primary); }
-        .left-header p { font-size:12px; color:var(--muted); margin-top:2px; }
+        /* ===== Layout ===== */
+        .app { display:flex; min-height:100vh; max-width:1500px; margin:0 auto; position:relative; z-index:1; }
 
-        /* 메인 액션 영역 */
-        .main-actions { padding:20px 24px; flex:1; display:flex; flex-direction:column; gap:16px; }
+        /* Left panel - Glassmorphism */
+        .left {
+            width:430px; min-width:430px;
+            background:var(--card);
+            backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+            border-right:1px solid var(--border);
+            border-radius:0 24px 24px 0;
+            display:flex; flex-direction:column; overflow-y:auto;
+            box-shadow:4px 0 30px rgba(155,114,207,.08);
+        }
+        .right { flex:1; padding:24px; overflow-y:auto; }
 
-        /* 드래그앤드롭 */
-        .drop-zone { border:2px dashed var(--border); border-radius:var(--radius); padding:36px 20px; text-align:center; cursor:pointer; transition:all .3s; background:var(--bg); }
-        .drop-zone:hover, .drop-zone.drag-over { border-color:var(--primary); background:var(--primary-light); transform:scale(1.01); }
+        /* Header */
+        .left-header {
+            padding:24px 28px 18px;
+            border-bottom:1px solid var(--border);
+            background:linear-gradient(135deg, rgba(155,114,207,.08), rgba(232,180,208,.08));
+        }
+        .left-header h1 {
+            font-family:'Quicksand','Noto Sans KR',sans-serif;
+            font-size:24px; font-weight:700; color:var(--primary);
+            display:flex; align-items:center; gap:8px;
+        }
+        .left-header p { font-size:12px; color:var(--muted); margin-top:3px; letter-spacing:.3px; }
+
+        /* Main actions */
+        .main-actions { padding:22px 28px; flex:1; display:flex; flex-direction:column; gap:16px; }
+
+        /* Drop zone */
+        .drop-zone {
+            border:2px dashed var(--border); border-radius:var(--radius);
+            padding:32px 20px; text-align:center; cursor:pointer;
+            transition:all .3s ease;
+            background:linear-gradient(135deg, var(--lily-white), rgba(243,238,250,.5));
+        }
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color:var(--primary); background:var(--primary-light);
+            transform:scale(1.01);
+            box-shadow:0 4px 20px var(--primary-glow);
+        }
         .drop-zone-icon { font-size:42px; margin-bottom:6px; }
         .drop-zone-text { font-size:13px; color:var(--muted); }
         .drop-zone-text strong { color:var(--primary); }
 
         .thumbnails { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-        .thumb { position:relative; width:56px; height:56px; border-radius:6px; overflow:hidden; border:1px solid var(--border); transition:transform .2s; }
-        .thumb:hover { transform:scale(1.1); }
+        .thumb {
+            position:relative; width:56px; height:56px;
+            border-radius:10px; overflow:hidden;
+            border:2px solid var(--border); transition:all .2s;
+        }
+        .thumb:hover { transform:scale(1.1); border-color:var(--primary); box-shadow:0 2px 10px var(--primary-glow); }
         .thumb img { width:100%; height:100%; object-fit:cover; }
-        .thumb-remove { position:absolute; top:1px; right:1px; width:16px; height:16px; background:var(--danger); color:#fff; border:none; border-radius:50%; font-size:9px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+        .thumb-remove {
+            position:absolute; top:2px; right:2px; width:18px; height:18px;
+            background:var(--danger); color:#fff; border:none; border-radius:50%;
+            font-size:9px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+            transition:transform .2s;
+        }
+        .thumb-remove:hover { transform:scale(1.2); }
         .file-count { font-size:12px; color:var(--muted); margin-top:4px; }
 
-        /* OCR 버튼 (크게) */
+        /* OCR Button */
         .btn-ocr {
-            padding:18px 24px; border:none; border-radius:12px; font-size:18px; font-weight:900;
-            font-family:inherit; cursor:pointer; width:100%; color:#fff;
-            background:linear-gradient(135deg, #2E86AB, #1a6b8a);
-            box-shadow:0 4px 15px rgba(46,134,171,.3);
+            padding:18px 24px; border:none; border-radius:16px; font-size:17px; font-weight:700;
+            font-family:'Quicksand','Noto Sans KR',sans-serif;
+            cursor:pointer; width:100%; color:#fff;
+            background:linear-gradient(135deg, #B388E8, #9B72CF, #8B5CC0);
+            box-shadow:0 6px 25px rgba(155,114,207,.35);
             transition:all .3s; position:relative; overflow:hidden;
+            letter-spacing:.5px;
         }
-        .btn-ocr:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 6px 25px rgba(46,134,171,.4); }
+        .btn-ocr::before {
+            content:''; position:absolute; top:0; left:-100%; width:100%; height:100%;
+            background:linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
+            transition:left .5s;
+        }
+        .btn-ocr:hover:not(:disabled)::before { left:100%; }
+        .btn-ocr:hover:not(:disabled) { transform:translateY(-3px); box-shadow:0 8px 30px rgba(155,114,207,.45); }
         .btn-ocr:active:not(:disabled) { transform:translateY(0); }
-        .btn-ocr:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+        .btn-ocr:disabled { opacity:.35; cursor:not-allowed; transform:none; }
 
-        /* 엑셀 다운로드 버튼 (크게) */
+        /* Excel Button */
         .btn-excel {
-            padding:18px 24px; border:none; border-radius:12px; font-size:18px; font-weight:900;
-            font-family:inherit; cursor:pointer; width:100%; color:#fff;
-            background:linear-gradient(135deg, #27AE60, #1e8449);
-            box-shadow:0 4px 15px rgba(39,174,96,.3);
+            padding:18px 24px; border:none; border-radius:16px; font-size:17px; font-weight:700;
+            font-family:'Quicksand','Noto Sans KR',sans-serif;
+            cursor:pointer; width:100%; color:#fff;
+            background:linear-gradient(135deg, #A8D8B8, #7EC8A0, #5BA87E);
+            box-shadow:0 6px 25px rgba(126,200,160,.3);
             transition:all .3s; position:relative; overflow:hidden;
+            letter-spacing:.5px;
         }
-        .btn-excel:hover { transform:translateY(-2px); box-shadow:0 6px 25px rgba(39,174,96,.4); }
+        .btn-excel::before {
+            content:''; position:absolute; top:0; left:-100%; width:100%; height:100%;
+            background:linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
+            transition:left .5s;
+        }
+        .btn-excel:hover::before { left:100%; }
+        .btn-excel:hover { transform:translateY(-3px); box-shadow:0 8px 30px rgba(126,200,160,.4); }
         .btn-excel:active { transform:translateY(0); }
         .btn-excel.downloading { animation:btn-celebrate .6s ease; }
         @keyframes btn-celebrate {
@@ -81,37 +158,35 @@
             100% { transform:scale(1); }
         }
 
-        /* 상태 표시 */
-        .status-bar { padding:10px 14px; border-radius:8px; font-size:13px; font-weight:500; display:none; align-items:center; gap:8px; }
+        /* Status bar */
+        .status-bar { padding:10px 14px; border-radius:10px; font-size:13px; font-weight:500; display:none; align-items:center; gap:8px; }
         .status-bar.show { display:flex; }
         .status-info { background:var(--primary-light); color:var(--primary); }
-        .status-success { background:#E8F5E9; color:var(--success); }
-        .status-error { background:#FDEDEE; color:var(--danger); }
+        .status-success { background:rgba(126,200,160,.15); color:var(--success-dark); }
+        .status-error { background:rgba(217,123,143,.12); color:var(--danger); }
 
-        /* 로딩 애니메이션 */
+        /* Loading animation - lily themed */
         .loading-container { display:none; flex-direction:column; align-items:center; gap:16px; padding:20px; }
         .loading-container.show { display:flex; }
-
-        .loading-dots { display:flex; gap:8px; align-items:center; }
+        .loading-dots { display:flex; gap:10px; align-items:center; }
         .loading-dot {
-            width:12px; height:12px; border-radius:50%; background:var(--primary);
-            animation:dot-bounce 1.4s ease-in-out infinite;
+            width:14px; height:14px; border-radius:50%;
+            animation:lily-pulse 1.6s ease-in-out infinite;
         }
-        .loading-dot:nth-child(2) { animation-delay:.2s; background:#3498DB; }
-        .loading-dot:nth-child(3) { animation-delay:.4s; background:#1ABC9C; }
-        .loading-dot:nth-child(4) { animation-delay:.6s; background:#27AE60; }
-        @keyframes dot-bounce {
+        .loading-dot:nth-child(1) { background:#C9A0E8; animation-delay:0s; }
+        .loading-dot:nth-child(2) { background:#B388E8; animation-delay:.2s; }
+        .loading-dot:nth-child(3) { background:#E8B4D0; animation-delay:.4s; }
+        .loading-dot:nth-child(4) { background:#9B72CF; animation-delay:.6s; }
+        @keyframes lily-pulse {
             0%,80%,100% { transform:scale(.4); opacity:.3; }
-            40% { transform:scale(1); opacity:1; }
+            40% { transform:scale(1.1); opacity:1; }
         }
-
         .loading-text { font-size:14px; font-weight:600; color:var(--primary); }
         .loading-sub { font-size:12px; color:var(--muted); }
+        .progress-bar { width:100%; height:8px; background:rgba(155,114,207,.12); border-radius:4px; overflow:hidden; }
+        .progress-fill { height:100%; background:linear-gradient(90deg,#B388E8,#E8B4D0,#9B72CF); border-radius:4px; transition:width .4s ease; }
 
-        .progress-bar { width:100%; height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
-        .progress-fill { height:100%; background:linear-gradient(90deg,var(--primary),#1ABC9C); border-radius:4px; transition:width .4s ease; }
-
-        /* 파티클 효과 (업로드 성공 시) */
+        /* Lily particle burst */
         .particle-container { position:fixed; pointer-events:none; z-index:9999; }
         .particle {
             position:absolute; width:8px; height:8px; border-radius:50%;
@@ -122,125 +197,191 @@
             100% { opacity:0; transform:translate(var(--tx),var(--ty)) scale(0); }
         }
 
-        /* 요약 */
+        /* Lily bloom celebration */
+        .bloom-overlay {
+            position:fixed; top:0; left:0; width:100%; height:100%;
+            pointer-events:none; z-index:9998;
+            display:flex; align-items:center; justify-content:center;
+        }
+        .bloom-lily {
+            font-size:80px; opacity:0;
+            animation:lily-bloom 2s ease-out forwards;
+        }
+        @keyframes lily-bloom {
+            0% { opacity:0; transform:scale(0) rotate(-30deg); }
+            30% { opacity:1; transform:scale(1.3) rotate(10deg); }
+            50% { transform:scale(1) rotate(0deg); }
+            70% { opacity:1; }
+            100% { opacity:0; transform:scale(1.5) rotate(15deg) translateY(-40px); }
+        }
+        .bloom-text {
+            position:absolute; font-size:20px; font-weight:700; color:var(--primary);
+            opacity:0; animation:bloom-text-fade 2s ease-out .3s forwards;
+            font-family:'Quicksand',sans-serif; text-shadow:0 2px 10px rgba(155,114,207,.3);
+        }
+        @keyframes bloom-text-fade {
+            0% { opacity:0; transform:translateY(20px); }
+            30% { opacity:1; transform:translateY(-50px); }
+            70% { opacity:1; }
+            100% { opacity:0; transform:translateY(-70px); }
+        }
+
+        /* Summary */
         .summary { display:flex; gap:10px; margin-top:8px; }
-        .summary-item { flex:1; background:var(--bg); padding:12px; border-radius:8px; text-align:center; }
-        .summary-value { font-size:20px; font-weight:900; color:var(--primary); }
+        .summary-item {
+            flex:1; padding:14px; border-radius:12px; text-align:center;
+            background:linear-gradient(135deg, var(--lily-white), var(--primary-light));
+            border:1px solid var(--border);
+        }
+        .summary-value { font-size:22px; font-weight:900; color:var(--primary); font-family:'Quicksand',sans-serif; }
         .summary-label { font-size:11px; color:var(--muted); margin-top:2px; }
 
-        /* 하단 설정 (접을 수 있는) */
+        /* Settings panel */
         .settings-toggle {
-            padding:12px 24px; border-top:1px solid var(--border); cursor:pointer;
+            padding:12px 28px; border-top:1px solid var(--border); cursor:pointer;
             display:flex; align-items:center; justify-content:space-between;
-            font-size:12px; font-weight:600; color:var(--muted); background:var(--bg);
-            transition:background .2s;
+            font-size:12px; font-weight:600; color:var(--muted);
+            background:rgba(243,238,250,.5); transition:background .2s;
         }
         .settings-toggle:hover { background:var(--primary-light); }
-        .settings-panel { padding:0 24px; max-height:0; overflow:hidden; transition:max-height .3s ease, padding .3s ease; background:var(--card); }
-        .settings-panel.open { max-height:600px; padding:16px 24px; }
-
+        .settings-panel {
+            padding:0 28px; max-height:0; overflow:hidden;
+            transition:max-height .3s ease, padding .3s ease;
+            background:var(--card-solid);
+        }
+        .settings-panel.open { max-height:600px; padding:16px 28px; }
         .section { margin-bottom:12px; }
         .section-title { font-size:12px; font-weight:700; color:var(--primary); margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid var(--primary-light); }
 
         label { display:block; font-size:11px; font-weight:500; color:var(--muted); margin-bottom:3px; }
-        input, select { width:100%; padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit; outline:none; transition:border-color .2s; }
-        input:focus, select:focus { border-color:var(--primary); }
+        input, select {
+            width:100%; padding:8px 12px; border:1px solid var(--border);
+            border-radius:10px; font-size:13px; font-family:inherit; outline:none;
+            transition:all .2s; background:rgba(255,255,255,.8);
+        }
+        input:focus, select:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-glow); }
         .input-group { margin-bottom:8px; }
         .input-row { display:flex; gap:8px; }
         .input-row > div { flex:1; }
 
-        /* API 선택 탭 */
-        .api-selector { display:flex; border-radius:6px; overflow:hidden; border:1px solid var(--border); }
-        .api-tab { flex:1; padding:5px 0; border:none; background:var(--bg); font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; transition:all .2s; color:var(--muted); }
+        /* API tabs */
+        .api-selector { display:flex; border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+        .api-tab {
+            flex:1; padding:6px 0; border:none; font-size:12px; font-weight:600;
+            font-family:inherit; cursor:pointer; transition:all .2s; color:var(--muted);
+            background:rgba(243,238,250,.4);
+        }
         .api-tab+.api-tab { border-left:1px solid var(--border); }
         .api-tab.active { background:var(--primary); color:#fff; }
         .api-tab:hover:not(.active) { background:var(--primary-light); color:var(--primary); }
         .api-key-wrap { position:relative; }
-        .api-key-toggle { position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:13px; color:var(--muted); }
+        .api-key-toggle { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:14px; color:var(--muted); }
 
-        /* 이름 매핑 */
+        /* Name mapping */
         .mapping-list { max-height:150px; overflow-y:auto; margin-top:6px; }
-        .mapping-item { display:flex; align-items:center; gap:4px; padding:3px 0; font-size:11px; border-bottom:1px solid var(--border); }
+        .mapping-item { display:flex; align-items:center; gap:4px; padding:4px 0; font-size:11px; border-bottom:1px solid var(--border); }
         .mapping-item span { flex:1; }
-        .btn-sm { padding:4px 8px; font-size:11px; border:none; border-radius:4px; cursor:pointer; font-family:inherit; font-weight:600; }
-        .btn-outline-sm { background:transparent; color:var(--primary); border:1px solid var(--primary); }
-        .row-btn { width:20px; height:20px; border:none; border-radius:3px; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center; }
-        .row-btn-del { background:#FDEDEE; color:var(--danger); }
+        .btn-sm { padding:4px 10px; font-size:11px; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-weight:600; }
+        .btn-outline-sm { background:transparent; color:var(--primary); border:1px solid var(--primary); transition:all .2s; }
+        .btn-outline-sm:hover { background:var(--primary); color:#fff; }
+        .row-btn { width:22px; height:22px; border:none; border-radius:6px; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+        .row-btn-del { background:rgba(217,123,143,.12); color:var(--danger); }
+        .row-btn-del:hover { background:var(--danger); color:#fff; }
 
-        /* ===== 오른쪽: 데이터 테이블 ===== */
-        .data-table-wrap { overflow-x:auto; }
+        /* ===== Data Table ===== */
+        .data-table-wrap { overflow-x:auto; border-radius:var(--radius); box-shadow:0 2px 15px rgba(155,114,207,.08); }
         .data-table { width:100%; border-collapse:collapse; font-size:13px; }
-        .data-table th { background:var(--primary); color:#fff; padding:8px 10px; text-align:left; font-weight:600; white-space:nowrap; position:sticky; top:0; z-index:1; }
-        .data-table td { padding:5px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
-        .data-table tr:hover { background:var(--primary-light); }
-        .data-table input { padding:3px 5px; font-size:12px; border:1px solid var(--border); border-radius:4px; width:100%; min-width:50px; }
+        .data-table th {
+            background:linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color:#fff; padding:10px 12px; text-align:left; font-weight:600;
+            white-space:nowrap; position:sticky; top:0; z-index:1;
+        }
+        .data-table th:first-child { border-radius:var(--radius) 0 0 0; }
+        .data-table th:last-child { border-radius:0 var(--radius) 0 0; }
+        .data-table td { padding:6px 10px; border-bottom:1px solid var(--border); white-space:nowrap; background:rgba(255,255,255,.6); }
+        .data-table tr:hover td { background:var(--primary-light); }
+        .data-table input {
+            padding:4px 6px; font-size:12px; border:1px solid var(--border);
+            border-radius:8px; width:100%; min-width:50px;
+            background:rgba(255,255,255,.9);
+        }
         .data-table .name-input { min-width:70px; }
         .data-table .service-input { min-width:120px; }
         .data-table .amount-input { min-width:70px; text-align:right; }
-        .unknown-cell { background:#FFF3E0 !important; }
-        .unknown-cell input { border-color:var(--warning); background:#FFF8E1; }
+        .unknown-cell { background:rgba(232,180,109,.1) !important; }
+        .unknown-cell input { border-color:var(--warning); background:rgba(232,180,109,.08); }
 
-        .empty-state { text-align:center; padding:60px 20px; color:var(--muted); }
-        .empty-state-icon { font-size:56px; margin-bottom:12px; }
+        .empty-state { text-align:center; padding:80px 20px; color:var(--muted); }
+        .empty-state-icon { font-size:64px; margin-bottom:16px; }
+        .empty-state p { font-size:14px; line-height:1.6; }
 
-        .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:6px 12px; border:none; border-radius:6px; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; transition:all .2s; }
+        .btn {
+            display:inline-flex; align-items:center; justify-content:center; gap:6px;
+            padding:7px 14px; border:none; border-radius:10px; font-size:12px;
+            font-weight:600; font-family:inherit; cursor:pointer; transition:all .2s;
+        }
         .btn-primary { background:var(--primary); color:#fff; }
+        .btn-primary:hover { background:var(--primary-dark); transform:translateY(-1px); }
         .btn-outline { background:transparent; color:var(--primary); border:1px solid var(--primary); }
+        .btn-outline:hover { background:var(--primary); color:#fff; }
     </style>
 </head>
 <body>
+    <!-- Falling Lily Petals Background -->
+    <div class="petal-container" id="petalContainer"></div>
+
     <div class="app">
-        <!-- 왼쪽 패널 -->
+        <!-- Left Panel -->
         <div class="left">
             <div class="left-header">
-                <h1>나리 영수증Bot</h1>
-                <p>일본 택시 청구서 자동 정산</p>
+                <h1>&#127804; Lily's Receipt Bot</h1>
+                <p>Japanese Taxi Invoice Auto Settlement</p>
             </div>
 
             <div class="main-actions">
-                <!-- 업로드 -->
+                <!-- Upload -->
                 <div class="drop-zone" id="dropZone">
-                    <div class="drop-zone-icon">&#128206;</div>
+                    <div class="drop-zone-icon">&#127804;</div>
                     <div class="drop-zone-text">
-                        영수증 이미지를 <strong>드래그</strong>, <strong>클릭</strong> 또는 <strong>Ctrl+V</strong><br>
-                        <small>PNG, JPG, PDF 지원 / 여러 장 가능 / 붙여넣기 지원</small>
+                        &#127804; <strong>Drag</strong>, <strong>Click</strong> or <strong>Ctrl+V</strong><br>
+                        <small>PNG, JPG, PDF / Multiple files / Paste supported</small>
                     </div>
                     <input type="file" id="fileInput" accept="image/*,application/pdf" multiple hidden>
                 </div>
                 <div class="thumbnails" id="thumbnails"></div>
                 <div class="file-count" id="fileCount"></div>
 
-                <!-- 정산 설정 (간단히) -->
+                <!-- Settings -->
                 <div class="input-row">
                     <div class="input-group">
-                        <label>월</label>
+                        <label>&#127804; Month</label>
                         <select id="month">
-                            <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
-                            <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
-                            <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
-                            <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+                            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                            <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                            <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                            <option value="10">10</option><option value="11">11</option><option value="12">12</option>
                         </select>
                     </div>
                     <div class="input-group">
-                        <label>연도</label>
+                        <label>Year</label>
                         <input type="number" id="year" value="2026" min="2019" max="2030">
                     </div>
                     <div class="input-group">
-                        <label>환율</label>
+                        <label>Exchange Rate</label>
                         <input type="number" id="exchangeRate" step="0.0001" value="9.3416">
                     </div>
                     <div class="input-group">
-                        <label>송금수수료</label>
+                        <label>Remittance Fee</label>
                         <input type="number" id="remittanceFee" step="1" value="49485">
                     </div>
                 </div>
 
-                <!-- OCR 버튼 -->
+                <!-- OCR Button -->
                 <button class="btn-ocr" id="ocrBtn" onclick="startOCR()" disabled>
-                    OCR 분석 시작
+                    &#127804; Start OCR Analysis
                 </button>
 
-                <!-- 로딩 애니메이션 -->
+                <!-- Loading -->
                 <div class="loading-container" id="loadingContainer">
                     <div class="loading-dots">
                         <div class="loading-dot"></div>
@@ -248,32 +389,31 @@
                         <div class="loading-dot"></div>
                         <div class="loading-dot"></div>
                     </div>
-                    <div class="loading-text" id="loadingText">영수증 분석 중...</div>
-                    <div class="loading-sub" id="loadingSub">AI가 일본어 텍스트를 읽고 있어요</div>
+                    <div class="loading-text" id="loadingText">Analyzing receipts...</div>
+                    <div class="loading-sub" id="loadingSub">AI is reading the Japanese text</div>
                     <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
                 </div>
 
-                <!-- 상태 -->
+                <!-- Status -->
                 <div class="status-bar" id="statusBar">
                     <span id="statusText"></span>
                 </div>
 
-                <!-- 요약 + 다운로드 -->
+                <!-- Download -->
                 <div id="downloadSection" style="display:none">
                     <div class="summary" id="summary"></div>
                     <button class="btn-excel" id="excelBtn" onclick="downloadExcel()" style="margin-top:12px">
-                        엑셀 다운로드
+                        &#127804; Download Excel
                     </button>
                 </div>
             </div>
 
-            <!-- 하단 접이식 설정 -->
+            <!-- Settings Panel -->
             <div class="settings-toggle" onclick="toggleSettings()">
-                <span>API 및 이름 매핑 설정</span>
+                <span>&#9881; API & Name Mapping Settings</span>
                 <span id="settingsArrow">&#9660;</span>
             </div>
             <div class="settings-panel" id="settingsPanel">
-                <!-- API 설정 -->
                 <div class="section">
                     <div class="section-title">AI API</div>
                     <div class="input-group">
@@ -285,38 +425,36 @@
                     </div>
                     <div class="input-group">
                         <div class="api-key-wrap">
-                            <input type="password" id="apiKey" placeholder="API Key 입력">
+                            <input type="password" id="apiKey" placeholder="API Key">
                             <button class="api-key-toggle" onclick="toggleApiKey()">&#128065;</button>
                         </div>
                     </div>
                 </div>
-
-                <!-- 이름 매핑 -->
                 <div class="section">
-                    <div class="section-title">이름 매핑</div>
+                    <div class="section-title">Name Mapping</div>
                     <div class="input-row">
                         <div class="input-group"><input type="text" id="newNameRoman" placeholder="HONG GILDONG"></div>
-                        <div class="input-group"><input type="text" id="newNameKorean" placeholder="홍길동"></div>
+                        <div class="input-group"><input type="text" id="newNameKorean" placeholder="&#54861;&#44600;&#46041;"></div>
                     </div>
-                    <button class="btn-sm btn-outline-sm" onclick="addNameMapping()">추가</button>
+                    <button class="btn-sm btn-outline-sm" onclick="addNameMapping()">Add</button>
                     <div class="mapping-list" id="mappingList"></div>
                 </div>
             </div>
         </div>
 
-        <!-- 오른쪽 패널 -->
+        <!-- Right Panel -->
         <div class="right">
             <div id="emptyState" class="empty-state">
-                <div class="empty-state-icon">&#128203;</div>
-                <p>영수증 이미지를 업로드하고<br>OCR 분석을 시작하세요</p>
+                <div class="empty-state-icon">&#127804;</div>
+                <p>Upload receipt images and<br>start OCR analysis &#127804;</p>
             </div>
 
             <div id="dataView" style="display:none">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                    <h2 style="font-size:16px;font-weight:700">OCR 분석 결과</h2>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+                    <h2 style="font-size:17px;font-weight:700;color:var(--primary);font-family:'Quicksand',sans-serif">&#127804; OCR Results</h2>
                     <div style="display:flex;gap:6px">
-                        <button class="btn btn-outline" onclick="addRow()">+ 행 추가</button>
-                        <button class="btn btn-primary" onclick="sortData()">날짜순 정렬</button>
+                        <button class="btn btn-outline" onclick="addRow()">+ Add Row</button>
+                        <button class="btn btn-primary" onclick="sortData()">Sort by Date</button>
                     </div>
                 </div>
 
@@ -324,12 +462,12 @@
                     <table class="data-table" id="dataTable">
                         <thead>
                             <tr>
-                                <th>날짜</th>
-                                <th>원본이름</th>
-                                <th>한국이름</th>
-                                <th>내용 (한국어)</th>
-                                <th>대수</th>
-                                <th>금액 (엔)</th>
+                                <th>Date</th>
+                                <th>Original Name</th>
+                                <th>Korean Name</th>
+                                <th>Description</th>
+                                <th>Qty</th>
+                                <th>Amount (JPY)</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -337,8 +475,8 @@
                     </table>
                 </div>
 
-                <div style="margin-top:12px;text-align:right">
-                    <strong id="totalDisplay" style="font-size:15px;color:var(--primary)"></strong>
+                <div style="margin-top:14px;text-align:right">
+                    <strong id="totalDisplay" style="font-size:15px;color:var(--primary);font-family:'Quicksand',sans-serif"></strong>
                 </div>
             </div>
         </div>
@@ -346,7 +484,7 @@
 
     <script src="data.js"></script>
     <script>
-        // ===== 상태 =====
+        // ===== State =====
         let uploadedImages = [];
         let ocrResults = [];
         let currentApi = 'claude';
@@ -358,14 +496,52 @@
         };
 
         const LOADING_MESSAGES = [
-            { text:'영수증 분석 중...', sub:'AI가 일본어 텍스트를 읽고 있어요' },
-            { text:'데이터 추출 중...', sub:'날짜, 이름, 금액을 찾고 있어요' },
-            { text:'이름 변환 중...', sub:'로마자를 한국어로 바꾸고 있어요' },
-            { text:'거의 다 됐어요!', sub:'마지막 검증 중이에요' },
+            { text:'&#127804; Analyzing receipts...', sub:'AI is reading Japanese text' },
+            { text:'&#127804; Extracting data...', sub:'Finding dates, names, and amounts' },
+            { text:'&#127804; Converting names...', sub:'Translating romaji to Korean' },
+            { text:'&#127804; Almost done!', sub:'Final verification in progress' },
         ];
 
-        // ===== 초기화 =====
+        // ===== Falling Lily Petals =====
+        function createPetals() {
+            const container = document.getElementById('petalContainer');
+            const petalSVGs = [
+                `<svg width="20" height="24" viewBox="0 0 20 24"><path d="M10 0C10 0 0 8 0 14c0 5.5 4.5 10 10 10s10-4.5 10-10C20 8 10 0 10 0z" fill="rgba(200,160,232,.35)"/></svg>`,
+                `<svg width="16" height="20" viewBox="0 0 16 20"><path d="M8 0C8 0 0 6 0 11c0 5 3.5 9 8 9s8-4 8-9C16 6 8 0 8 0z" fill="rgba(232,180,208,.4)"/></svg>`,
+                `<svg width="14" height="18" viewBox="0 0 14 18"><ellipse cx="7" cy="9" rx="7" ry="9" fill="rgba(179,136,232,.25)"/></svg>`,
+            ];
+            function spawnPetal() {
+                const petal = document.createElement('div');
+                petal.className = 'petal';
+                petal.innerHTML = petalSVGs[Math.floor(Math.random() * petalSVGs.length)];
+                petal.style.left = Math.random() * 100 + '%';
+                petal.style.setProperty('--drift', (Math.random() * 100 - 50) + 'px');
+                petal.style.setProperty('--spin', (Math.random() * 720 - 360) + 'deg');
+                const duration = 8 + Math.random() * 7;
+                petal.style.animationDuration = duration + 's';
+                container.appendChild(petal);
+                setTimeout(() => petal.remove(), duration * 1000);
+            }
+            setInterval(spawnPetal, 2500);
+            for (let i = 0; i < 5; i++) setTimeout(spawnPetal, i * 800);
+        }
+
+        // ===== Lily Bloom Celebration =====
+        function showLilyBloom(text) {
+            const overlay = document.createElement('div');
+            overlay.className = 'bloom-overlay';
+            overlay.innerHTML = `
+                <div class="bloom-lily">&#127804;</div>
+                <div class="bloom-text">${text}</div>
+            `;
+            document.body.appendChild(overlay);
+            setTimeout(() => overlay.remove(), 2500);
+        }
+
+        // ===== Init =====
         window.addEventListener('DOMContentLoaded', () => {
+            createPetals();
+
             const savedApi = localStorage.getItem('selected_api');
             if (savedApi && API_CONFIG[savedApi]) switchApi(savedApi);
             else switchApi('claude');
@@ -390,7 +566,7 @@
             dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
             fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
-            // Ctrl+V 클립보드 붙여넣기
+            // Ctrl+V clipboard paste
             document.addEventListener('paste', e => {
                 const items = e.clipboardData?.items;
                 if (!items) return;
@@ -410,7 +586,7 @@
             renderMappings();
         });
 
-        // ===== 설정 패널 토글 =====
+        // ===== Settings =====
         function toggleSettings() {
             const panel = document.getElementById('settingsPanel');
             const arrow = document.getElementById('settingsArrow');
@@ -436,7 +612,7 @@
             i.type = i.type === 'password' ? 'text' : 'password';
         }
 
-        // ===== 파일 처리 =====
+        // ===== File handling =====
         function handlePastedImages(files) {
             let added = 0;
             for (const file of files) {
@@ -448,8 +624,7 @@
                     updateOcrButton();
                     if (added === 1) {
                         spawnParticles(document.getElementById('dropZone'));
-                        showStatus(`클립보드에서 이미지 ${files.length}장 붙여넣기 완료!`, 'success');
-                        // 드롭존 깜빡임 효과
+                        showStatus(`&#127804; ${files.length} image(s) pasted from clipboard!`, 'success');
                         const dz = document.getElementById('dropZone');
                         dz.classList.add('drag-over');
                         setTimeout(() => dz.classList.remove('drag-over'), 600);
@@ -463,9 +638,8 @@
             let added = 0;
             for (const file of files) {
                 if (file.type === 'application/pdf') {
-                    // PDF → 이미지 변환
                     try {
-                        showStatus('PDF를 이미지로 변환 중...', 'info');
+                        showStatus('&#127804; Converting PDF to images...', 'info');
                         const pdfImages = await pdfToImages(file);
                         for (const img of pdfImages) {
                             uploadedImages.push(img);
@@ -473,10 +647,10 @@
                         }
                         renderThumbnails();
                         updateOcrButton();
-                        showStatus(`PDF에서 ${pdfImages.length}페이지 변환 완료!`, 'success');
+                        showStatus(`&#127804; ${pdfImages.length} pages converted from PDF!`, 'success');
                         if (added > 0) spawnParticles(document.getElementById('dropZone'));
                     } catch (err) {
-                        showStatus(`PDF 변환 오류: ${err.message}`, 'error');
+                        showStatus(`PDF error: ${err.message}`, 'error');
                     }
                 } else if (file.type.match(/image\/(png|jpeg|jpg|webp)/)) {
                     const reader = new FileReader();
@@ -492,16 +666,14 @@
             }
         }
 
-        // PDF → 이미지 변환 (pdf.js)
         async function pdfToImages(file) {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             const images = [];
-
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
-                const scale = 2.0; // 고해상도
+                const scale = 2.0;
                 const viewport = page.getViewport({ scale });
                 const canvas = document.createElement('canvas');
                 canvas.width = viewport.width;
@@ -526,7 +698,7 @@
                 d.innerHTML = `<img src="${img.dataUrl}" alt="receipt ${i+1}"><button class="thumb-remove" onclick="removeImage(${i})">&#10005;</button>`;
                 c.appendChild(d);
             });
-            document.getElementById('fileCount').textContent = uploadedImages.length > 0 ? `${uploadedImages.length}개 파일 선택됨` : '';
+            document.getElementById('fileCount').textContent = uploadedImages.length > 0 ? `&#127804; ${uploadedImages.length} file(s) selected` : '';
         }
 
         function removeImage(i) { uploadedImages.splice(i, 1); renderThumbnails(); updateOcrButton(); }
@@ -535,7 +707,7 @@
             document.getElementById('ocrBtn').disabled = uploadedImages.length === 0 || !document.getElementById('apiKey').value.trim();
         }
 
-        // ===== 파티클 효과 =====
+        // ===== Particle effect (lily themed) =====
         function spawnParticles(el) {
             const rect = el.getBoundingClientRect();
             const cx = rect.left + rect.width / 2;
@@ -546,7 +718,7 @@
             container.style.top = cy + 'px';
             document.body.appendChild(container);
 
-            const colors = ['#2E86AB','#27AE60','#F39C12','#E74C3C','#9B59B6','#1ABC9C'];
+            const colors = ['#C9A0E8','#E8B4D0','#B388E8','#9B72CF','#D4A0D0','#A88BC8'];
             for (let i = 0; i < 20; i++) {
                 const p = document.createElement('div');
                 p.className = 'particle';
@@ -562,11 +734,11 @@
             setTimeout(() => container.remove(), 1200);
         }
 
-        // ===== 상태 표시 =====
+        // ===== Status =====
         function showStatus(msg, type = 'info') {
             const bar = document.getElementById('statusBar');
             bar.className = `status-bar show status-${type}`;
-            document.getElementById('statusText').textContent = msg;
+            document.getElementById('statusText').innerHTML = msg;
         }
         function hideStatus() { document.getElementById('statusBar').className = 'status-bar'; }
 
@@ -574,7 +746,7 @@
             const c = document.getElementById('loadingContainer');
             c.classList.add('show');
             const msgIdx = Math.min(current, LOADING_MESSAGES.length - 1);
-            document.getElementById('loadingText').textContent = LOADING_MESSAGES[msgIdx].text;
+            document.getElementById('loadingText').innerHTML = LOADING_MESSAGES[msgIdx].text;
             document.getElementById('loadingSub').textContent = `(${current+1}/${total}) ${LOADING_MESSAGES[msgIdx].sub}`;
             document.getElementById('progressFill').style.width = `${((current+1)/total)*100}%`;
         }
@@ -586,8 +758,8 @@
         // ===== OCR =====
         async function startOCR() {
             const apiKey = document.getElementById('apiKey').value.trim();
-            if (!apiKey) { alert(`${API_CONFIG[currentApi].label} API Key를 입력하세요.`); return; }
-            if (uploadedImages.length === 0) { alert('이미지를 업로드하세요.'); return; }
+            if (!apiKey) { alert(`Please enter ${API_CONFIG[currentApi].label} API Key.`); return; }
+            if (uploadedImages.length === 0) { alert('Please upload images.'); return; }
 
             const ocrBtn = document.getElementById('ocrBtn');
             ocrBtn.disabled = true;
@@ -603,7 +775,7 @@
                     if (result.rows) allRows = allRows.concat(result.rows);
                 } catch (err) {
                     hideLoading();
-                    showStatus(`OCR 오류 (이미지 ${i+1}): ${err.message}`, 'error');
+                    showStatus(`OCR Error (image ${i+1}): ${err.message}`, 'error');
                     ocrBtn.disabled = false;
                     return;
                 }
@@ -611,7 +783,7 @@
             hideLoading();
 
             if (allRows.length === 0) {
-                showStatus('추출된 데이터가 없습니다.', 'error');
+                showStatus('No data extracted.', 'error');
                 ocrBtn.disabled = false;
                 return;
             }
@@ -620,7 +792,6 @@
                 const nameResult = findKoreanName(row.customer_name || '');
                 const rawDate = row.date || '';
 
-                // "레이와8년 1월 15일" → "레이와8년-01-15" 형식으로 변환
                 let dateDisplay = rawDate;
                 let excelSerial = null;
                 const dateMatch = rawDate.match(/[레레이와]*(\d+)년\s*(\d+)월\s*(\d+)일/);
@@ -645,10 +816,9 @@
                 };
             });
 
-            // 원본 순서 그대로 유지 (자동 정렬 안 함)
-
             spawnParticles(ocrBtn);
-            showStatus(`${ocrResults.length}건의 데이터를 추출했습니다!`, 'success');
+            showLilyBloom(`${ocrResults.length} items extracted!`);
+            showStatus(`&#127804; ${ocrResults.length} records extracted successfully!`, 'success');
             ocrBtn.disabled = false;
 
             renderDataTable();
@@ -658,7 +828,7 @@
             updateSummary();
         }
 
-        // ===== API 라우터 =====
+        // ===== API Router =====
         async function callOCR(apiKey, dataUrl, mimeType) {
             const base64Data = dataUrl.split(',')[1];
             const actualMimeType = dataUrl.split(';')[0].split(':')[1] || mimeType;
@@ -669,7 +839,7 @@
             else if (currentApi === 'gemini') text = await callGemini(apiKey, base64Data, actualMimeType, prompt);
             else if (currentApi === 'openai') text = await callOpenAI(apiKey, dataUrl, prompt);
 
-            if (!text) throw new Error('API 응답이 비어있습니다.');
+            if (!text) throw new Error('API response is empty.');
 
             try { return JSON.parse(text); }
             catch (e) {
@@ -677,7 +847,7 @@
                 if (b) return JSON.parse(b[1]);
                 const m = text.match(/\{[\s\S]*\}/);
                 if (m) return JSON.parse(m[0]);
-                throw new Error('JSON 파싱 실패');
+                throw new Error('JSON parsing failed');
             }
         }
 
@@ -692,7 +862,7 @@
                     { type:'text', text:prompt }
                 ]}], temperature:0.1 })
             });
-            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `Claude API 오류 (${r.status})`); }
+            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `Claude API Error (${r.status})`); }
             const d = await r.json(); return d.content?.[0]?.text;
         }
 
@@ -701,7 +871,7 @@
                 method:'POST', headers:{ 'Content-Type':'application/json' },
                 body: JSON.stringify({ contents:[{ parts:[{ inlineData:{ mimeType, data:base64Data } },{ text:prompt }] }], generationConfig:{ responseMimeType:'application/json', temperature:0.1 } })
             });
-            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `Gemini API 오류 (${r.status})`); }
+            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `Gemini API Error (${r.status})`); }
             const d = await r.json(); return d.candidates?.[0]?.content?.parts?.[0]?.text;
         }
 
@@ -713,17 +883,17 @@
                     { type:'text', text:prompt }
                 ]}], temperature:0.1 })
             });
-            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `OpenAI API 오류 (${r.status})`); }
+            if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message || `OpenAI API Error (${r.status})`); }
             const d = await r.json(); return d.choices?.[0]?.message?.content;
         }
 
-        // ===== 데이터 테이블 (1차/2차 구분 없이 전체) =====
+        // ===== Data Table =====
         function renderDataTable() {
             const tbody = document.getElementById('dataBody');
             tbody.innerHTML = '';
 
             if (ocrResults.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">데이터가 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No data.</td></tr>`;
                 document.getElementById('totalDisplay').textContent = '';
                 return;
             }
@@ -735,7 +905,7 @@
                 tr.innerHTML = `
                     <td><input type="text" value="${row.dateDisplay}" style="width:150px;font-size:12px" onchange="updateRow(${i},'dateDisplay',this.value)" placeholder="레이와○년-MM-DD"></td>
                     <td style="font-size:11px;color:var(--muted)">${row.originalName}</td>
-                    <td class="${nameClass}"><input class="name-input" value="${row.koreanName}" placeholder="한국이름" onchange="updateRow(${i},'koreanName',this.value)"></td>
+                    <td class="${nameClass}"><input class="name-input" value="${row.koreanName}" placeholder="Korean name" onchange="updateRow(${i},'koreanName',this.value)"></td>
                     <td><input class="service-input" value="${row.koreanService}" onchange="updateRow(${i},'koreanService',this.value)"></td>
                     <td><input type="number" class="amount-input" value="${row.vehicleCount}" min="1" style="width:45px" onchange="updateRow(${i},'vehicleCount',this.value)"></td>
                     <td><input type="number" class="amount-input" value="${row.amount}" onchange="updateRow(${i},'amount',this.value)"></td>
@@ -745,7 +915,7 @@
             });
 
             const total = ocrResults.reduce((s, r) => s + Number(r.amount), 0);
-            document.getElementById('totalDisplay').textContent = `합계: ${total.toLocaleString()} 엔`;
+            document.getElementById('totalDisplay').innerHTML = `&#127804; Total: ${total.toLocaleString()} JPY`;
         }
 
         function updateRow(index, field, value) {
@@ -753,7 +923,6 @@
             else if (field === 'amount') ocrResults[index][field] = parseFloat(value) || 0;
             else if (field === 'dateDisplay') {
                 ocrResults[index].dateDisplay = value;
-                // 엑셀용 시리얼 재계산
                 const dateMatch = value.match(/(\d+)년[^\d]*(\d+)[^\d]*(\d+)/);
                 if (dateMatch) {
                     ocrResults[index].excelSerial = reiwaToExcelSerial(parseInt(dateMatch[1]), parseInt(dateMatch[2]), parseInt(dateMatch[3]));
@@ -794,29 +963,30 @@
             const total = ocrResults.reduce((s, r) => s + Number(r.amount), 0);
             const count = ocrResults.length;
             document.getElementById('summary').innerHTML = `
-                <div class="summary-item"><div class="summary-value">${count}</div><div class="summary-label">총 건수</div></div>
-                <div class="summary-item"><div class="summary-value">${total.toLocaleString()}</div><div class="summary-label">합계 (엔)</div></div>
+                <div class="summary-item"><div class="summary-value">${count}</div><div class="summary-label">&#127804; Total Records</div></div>
+                <div class="summary-item"><div class="summary-value">${total.toLocaleString()}</div><div class="summary-label">&#127804; Total (JPY)</div></div>
             `;
-            document.getElementById('totalDisplay').textContent = `합계: ${total.toLocaleString()} 엔`;
+            document.getElementById('totalDisplay').innerHTML = `&#127804; Total: ${total.toLocaleString()} JPY`;
         }
 
-        // ===== 엑셀 (단일 테이블, 1차/2차 구분 없이) =====
+        // ===== Excel =====
         function downloadExcel() {
             const month = parseInt(document.getElementById('month').value);
             const rate = parseFloat(document.getElementById('exchangeRate').value) || 0;
             const fee = parseFloat(document.getElementById('remittanceFee').value) || 0;
-            if (!rate) { alert('환율을 입력하세요.'); return; }
+            if (!rate) { alert('Please enter exchange rate.'); return; }
 
             const btn = document.getElementById('excelBtn');
             btn.classList.add('downloading');
             setTimeout(() => btn.classList.remove('downloading'), 700);
             spawnParticles(btn);
+            showLilyBloom('Excel downloaded!');
 
             const wb = XLSX.utils.book_new();
             const ws = buildSheet(month, ocrResults, rate, fee);
             XLSX.utils.book_append_sheet(wb, ws, `미쯔이${month}월`);
             XLSX.writeFile(wb, `미쯔이택시_${month}월_정산.xlsx`);
-            showStatus('엑셀 파일이 다운로드되었습니다!', 'success');
+            showStatus('&#127804; Excel file downloaded!', 'success');
         }
 
         function buildSheet(month, data, rate, fee) {
@@ -824,7 +994,7 @@
             const total = data.reduce((s, r) => s + Number(r.amount), 0);
             const krwTotal = data.reduce((s, r, i) => s + (rate * Number(r.amount)) + (i === 0 ? fee : 0), 0);
 
-            const hdrS = { font:{bold:true,sz:11}, alignment:{horizontal:'center'}, fill:{fgColor:{rgb:'E8F4F8'}}, border:{ top:{style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} } };
+            const hdrS = { font:{bold:true,sz:11}, alignment:{horizontal:'center'}, fill:{fgColor:{rgb:'F3EEFA'}}, border:{ top:{style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} } };
             const ttlS = { font:{bold:true,sz:13} };
             const lblS = { font:{bold:true,sz:11} };
             const numS = { numFmt:'#,##0', alignment:{horizontal:'right'} };
@@ -842,7 +1012,6 @@
 
             data.forEach((row, i) => {
                 const r = 12 + i;
-                // 날짜: 레이와○년-MM-DD 텍스트로 저장
                 ws[`B${r}`] = { v:row.dateDisplay || '', s:bdrS };
                 ws[`H${r}`] = { v:row.dateDisplay || '', s:bdrS };
                 ws[`C${r}`] = { v:row.koreanName || row.originalName, s:bdrS };
@@ -864,11 +1033,11 @@
             return ws;
         }
 
-        // ===== 이름 매핑 =====
+        // ===== Name Mapping =====
         function addNameMapping() {
             const roman = document.getElementById('newNameRoman').value.trim().toUpperCase();
             const korean = document.getElementById('newNameKorean').value.trim();
-            if (!roman || !korean) { alert('로마자와 한국이름을 모두 입력하세요.'); return; }
+            if (!roman || !korean) { alert('Please enter both romanized and Korean names.'); return; }
             const m = JSON.parse(localStorage.getItem('user_name_map') || '{}');
             m[roman] = korean;
             localStorage.setItem('user_name_map', JSON.stringify(m));
@@ -893,7 +1062,7 @@
             const c = document.getElementById('mappingList');
             const m = JSON.parse(localStorage.getItem('user_name_map') || '{}');
             const e = Object.entries(m);
-            if (e.length === 0) { c.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">저장된 매핑 없음</div>'; return; }
+            if (e.length === 0) { c.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">No saved mappings</div>'; return; }
             c.innerHTML = e.map(([k,v]) => `<div class="mapping-item"><span>${k}</span><span style="font-weight:600">${v}</span><button class="row-btn row-btn-del" onclick="removeNameMapping('${k}')" style="flex:none">&#10005;</button></div>`).join('');
         }
     </script>
